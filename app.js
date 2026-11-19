@@ -1,7 +1,7 @@
 import {renderOffsetVisualization} from './offset-visual.mjs';
 import {initTypography} from './typography.mjs';
 import {placeDimensionLabels} from './dimension-layout.mjs';
-import {referenceLayout,bestDrawingAngle,readableTextAngle} from './labels.mjs';
+import {bendReferenceLayout,bestDrawingAngle,readableTextAngle} from './labels.mjs?v=19';
 import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs';
 import{geometry,extend,triangle,practicalOffsetLength,calculate}from'./geometry.mjs';
 const $=id=>document.getElementById(id),fmt=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:1}):'—';
@@ -34,8 +34,7 @@ function draw(g,preview,target=$('drawing'),work=false){
  const pageHeight=work?1200:540,plotWidth=work?640:600,plotHeight=work?1000:320;
  const angle=bestDrawingAngle(g.points,plotWidth,plotHeight),c=Math.cos(angle),sn=Math.sin(angle),rotate=p=>[p[0]*c-p[1]*sn,p[0]*sn+p[1]*c],rotated=g.points.map(rotate),xs=rotated.map(p=>p[0]),ys=rotated.map(p=>p[1]),minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys),scale=Math.min(plotWidth/Math.max(1,maxx-minx),plotHeight/Math.max(1,maxy-miny));
  const base=p=>{const q=rotate(p);return[450+(q[0]-(minx+maxx)/2)*scale,(work?600:255)-(q[1]-(miny+maxy)/2)*scale];};
- const refs=g.arcs.map((a,i)=>{const p=base(a.samples[16]);return{type:'angle',index:i,order:i,x:p[0],y:p[1],id:'B'+(i+1)};});
- const layout=referenceLayout(refs,{height:pageHeight}),P=p=>{const q=base(p);return[q[0],q[1]+(layout.height-pageHeight)/2];};
+ const layout=bendReferenceLayout(g.arcs,base,{height:pageHeight}),P=layout.project;
  function el(tag,attrs,parent=svg){const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);parent.append(e);return e;}
  // All leaders sit behind all label backgrounds and text.
  const pipes=el('g',{'data-layer':'pipe'}),leaders=el('g',{'data-layer':'leaders'}),labels=el('g',{'data-layer':'labels'}),ends=el('g',{'data-layer':'endpoints'});
@@ -51,8 +50,8 @@ function draw(g,preview,target=$('drawing'),work=false){
  for(const ref of layout.labels){
   obstacles.push(rect(ref.labelX-badgeWidth/2-4,ref.labelY-18,badgeWidth+8,36));
   const edge=ref.labelX+(ref.side?-1:1)*badgeWidth/2,rail=edge+(ref.side?-8:8);
-  el('polyline',{points:`${ref.x},${ref.y} ${rail},${ref.y} ${rail},${ref.labelY} ${edge},${ref.labelY}`,fill:'none',stroke:'#d0a17b','stroke-width':1.1},leaders);
-  el('circle',{cx:ref.x,cy:ref.y,r:3.5,fill:'#ae5c15',stroke:'white','stroke-width':1},leaders);
+  el('polyline',{'data-bend':ref.id,points:`${ref.x},${ref.y} ${rail},${ref.y} ${rail},${ref.labelY} ${edge},${ref.labelY}`,fill:'none',stroke:'#d0a17b','stroke-width':1.1},leaders);
+  el('circle',{'data-bend':ref.id,cx:ref.x,cy:ref.y,r:3.5,fill:'#ae5c15',stroke:'white','stroke-width':1},leaders);
   const badge=el('g',{'data-reference':ref.id,class:'reference-badge'},labels);
   el('rect',{x:ref.labelX-badgeWidth/2,y:ref.labelY-14,width:badgeWidth,height:28,rx:6,fill:'#fff2e4',stroke:'#ae5c15','stroke-width':1.2},badge);
   el('text',{x:ref.labelX,y:ref.labelY+5,'font-family':'var(--app-font, sans-serif)','font-size':16,'font-weight':700,'text-anchor':'middle',fill:'#ae5c15'},badge).textContent=work?ref.id+' · '+fmt(Math.abs(g.arcs[ref.index].turn))+'°':ref.id;

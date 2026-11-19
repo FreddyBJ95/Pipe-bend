@@ -12,6 +12,21 @@ export function referenceLayout(items,{width=900,height=540}={}){
  }
  return {height:layoutHeight,labels};
 }
+// Pipe paths and bend leaders share this final projection, including any extra
+// height needed by crowded labels. Label placement must never move a bend anchor.
+export function bendReferenceLayout(arcs,project,{width=900,height=540}={}){
+ const refs=arcs.map((arc,index)=>{
+  const [x,y]=project(arc.samples[16]);
+  return {type:'angle',index,order:index,x,y,id:'B'+(index+1)};
+ });
+ const layout=referenceLayout(refs,{width,height}),shift=(layout.height-height)/2;
+ const finalProject=point=>{const [x,y]=project(point);return [x,y+shift];};
+ const labels=layout.labels.map(ref=>{
+  const [x,y]=finalProject(arcs[ref.index].samples[16]);
+  return {...ref,x,y};
+ });
+ return {...layout,labels,project:finalProject};
+}
 // Rotate only the view, never the pipe model. Prefer a wide, readable fit.
 export function bestDrawingAngle(points,width=460,height=300){
  if(points.length<2)return 0;

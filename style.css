@@ -83,3 +83,4 @@ header{height:68px}.brand-logo{width:48px;height:48px}.app-menu{position:relativ
  .work-data h1{font-size:22px}.work-data>.dimensions-unit,.work-data-number{font-size:11px;margin:8px 0}
  .work-data #work-blank{height:28mm}.work-data h2{break-after:avoid}.work-data .work-specs{break-inside:avoid}
 }
+#bend-fields[hidden]{display:none!important}
