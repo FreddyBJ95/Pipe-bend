@@ -1,0 +1,82 @@
+[
+  {
+    "family": "Poppins",
+    "weight": 400,
+    "style": "normal",
+    "path": "pipe-bend/fonts/poppins-400.ttf",
+    "license": "OFL-1.1",
+    "size": 160316
+  },
+  {
+    "family": "Roboto",
+    "weight": 700,
+    "style": "normal",
+    "path": "pipe-bend/fonts/roboto-700.ttf",
+    "license": "Apache-2.0",
+    "size": 150036
+  },
+  {
+    "family": "Roboto",
+    "weight": 400,
+    "style": "normal",
+    "path": "pipe-bend/fonts/roboto-400.ttf",
+    "license": "Apache-2.0",
+    "size": 149332
+  },
+  {
+    "family": "IBM Plex Sans",
+    "weight": 400,
+    "style": "normal",
+    "path": "pipe-bend/fonts/ibm-plex-sans-400.ttf",
+    "license": "OFL-1.1",
+    "size": 186360
+  },
+  {
+    "family": "IBM Plex Sans",
+    "weight": 700,
+    "style": "normal",
+    "path": "pipe-bend/fonts/ibm-plex-sans-700.ttf",
+    "license": "OFL-1.1",
+    "size": 186504
+  },
+  {
+    "family": "Open Sans",
+    "weight": 700,
+    "style": "normal",
+    "path": "pipe-bend/fonts/open-sans-700.ttf",
+    "license": "Apache-2.0",
+    "size": 224452
+  },
+  {
+    "family": "Open Sans",
+    "weight": 400,
+    "style": "normal",
+    "path": "pipe-bend/fonts/open-sans-400.ttf",
+    "license": "Apache-2.0",
+    "size": 217276
+  },
+  {
+    "family": "Source Sans Pro",
+    "weight": 400,
+    "style": "normal",
+    "path": "pipe-bend/fonts/source-sans-pro-400.ttf",
+    "license": "OFL-1.1",
+    "size": 293516
+  },
+  {
+    "family": "Source Sans Pro",
+    "weight": 700,
+    "style": "normal",
+    "path": "pipe-bend/fonts/source-sans-pro-700.ttf",
+    "license": "OFL-1.1",
+    "size": 290916
+  },
+  {
+    "family": "Lato",
+    "weight": 400,
+    "style": "normal",
+    "path": "pipe-bend/fonts/lato-400.ttf",
+    "license": "OFL-1.1",
+    "size": 656568
+  }
+]
