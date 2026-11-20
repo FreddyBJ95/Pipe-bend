@@ -1,6 +1,12 @@
 const messages={
-  "Tegningsnummer": {"nb":"Tegningsnummer","en":"Drawing number"},
-  "Rørtegning med mål": {"nb":"Rørtegning med mål","en":"Pipe drawing with dimensions"},
+  "Tegningsnummer": {
+    "nb": "Tegningsnummer",
+    "en": "Drawing number"
+  },
+  "Rørtegning med mål": {
+    "nb": "Rørtegning med mål",
+    "en": "Pipe drawing with dimensions"
+  },
   "Installer app": {
     "nb": "Installer app",
     "en": "Install app"
@@ -688,6 +694,46 @@ const messages={
   "Angiv et projektnavn og gyldige rørdimensioner. Godstykkelsen skal være under halvdelen af diameteren, og centerlinjeradius skal være større end halvdelen af diameteren.": {
     "nb": "Skriv inn et prosjektnavn og gyldige rørdimensjoner. Veggtykkelsen må være under halvparten av diameteren, og senterlinjeradius må være større enn halvparten av diameteren.",
     "en": "Enter a project name and valid pipe dimensions. Wall thickness must be less than half the diameter, and centerline radius must be greater than half the diameter."
+  },
+  "Del appen": {
+    "nb": "Del appen",
+    "en": "Share the app"
+  },
+  "Lad din kollega scanne QR-koden med mobilens kamera.": {
+    "nb": "La kollegaen din skanne QR-koden med mobilkameraet.",
+    "en": "Let your colleague scan the QR code with their phone camera."
+  },
+  "QR-kode til Pipe-bend": {
+    "nb": "QR-kode til Pipe-bend",
+    "en": "QR code for Pipe-bend"
+  },
+  "Appens adresse": {
+    "nb": "Appens adresse",
+    "en": "App address"
+  },
+  "Åbn appen": {
+    "nb": "Åpne appen",
+    "en": "Open the app"
+  },
+  "Del link": {
+    "nb": "Del lenke",
+    "en": "Share link"
+  },
+  "Kopiér link": {
+    "nb": "Kopier lenke",
+    "en": "Copy link"
+  },
+  "Linket er kopieret.": {
+    "nb": "Lenken er kopiert.",
+    "en": "Link copied."
+  },
+  "Adressen er markeret. Kopiér den manuelt.": {
+    "nb": "Adressen er markert. Kopier den manuelt.",
+    "en": "The address is selected. Copy it manually."
+  },
+  "Kunne ikke åbne deling. Du kan kopiere linket i stedet.": {
+    "nb": "Kunne ikke åpne deling. Du kan kopiere lenken i stedet.",
+    "en": "Could not open sharing. You can copy the link instead."
   }
 };
 export const locales={da:'da-DK',nb:'nb-NO',en:'en-GB'};

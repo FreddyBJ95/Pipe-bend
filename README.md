@@ -73,3 +73,6 @@ Første A4-side indeholder kun rørtegningen med længder i mm, B-referencer med
 Det valgte PB-logo bruges uændret i appen. PWA-manifestet indeholder192- og512-pixel ikoner samt et separat maskable-ikon med beskyttet margen. iPhone og iPad bruger et180-pixel Apple Touch-ikon.
 
 Vinkelreferencernes prik og forbindelseslinje bruger samme koordinater som rørets buemidte i både redigering, arbejdsvisning og SVG/print. Ekstra højde til tætte referencer flytter rør og ankre samlet.
+
+## Del appen
+Menu → Del appen viser en QR-kode, appens offentlige adresse og knapper til at dele eller kopiere linket. QR-koden virker også offline, når appen er indlæst én gang. Linket åbner altid den offentlige app; rørprojekter og lokale indstillinger deles ikke.
