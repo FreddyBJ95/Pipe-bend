@@ -734,6 +734,150 @@ const messages={
   "Kunne ikke åbne deling. Du kan kopiere linket i stedet.": {
     "nb": "Kunne ikke åpne deling. Du kan kopiere lenken i stedet.",
     "en": "Could not open sharing. You can copy the link instead."
+  },
+  "Planlæg rum": {
+    "nb": "Planlegg rom",
+    "en": "Plan room"
+  },
+  "Bukker": {
+    "nb": "Rørbøyer",
+    "en": "Tube bender"
+  },
+  "Egen radius / andet værktøj": {
+    "nb": "Egen radius / annet verktøy",
+    "en": "Custom radius / other tool"
+  },
+  "Måltype": {
+    "nb": "Måletype",
+    "en": "Dimension type"
+  },
+  "Færdigmål til centerlinjehjørner": {
+    "nb": "Ferdigmål til senterlinjehjørner",
+    "en": "Finished dimensions to centerline vertices"
+  },
+  "Lige længder mellem tangentpunkter": {
+    "nb": "Rette lengder mellom tangentpunkter",
+    "en": "Straight lengths between tangent points"
+  },
+  "Mål til centerlinjehjørner": {
+    "nb": "Mål til senterlinjehjørner",
+    "en": "Dimensions to centerline vertices"
+  },
+  "Næste færdigmål til hjørne": {
+    "nb": "Neste ferdigmål til hjørne",
+    "en": "Next finished dimension to vertex"
+  },
+  "Afsætningsmål på stangen": {
+    "nb": "Avsettingsmål på røret",
+    "en": "Layout marks on straight tube"
+  },
+  "Afsætningsfradrag følger producentens tabel.": {
+    "nb": "Avsettingsfradrag følger produsentens tabell.",
+    "en": "Layout adjustments follow the manufacturer’s table."
+  },
+  "Angiv rørdiameter og centerlinjeradius. Der vises geometriske mål uden værktøjstabel.": {
+    "nb": "Angi rørdiameter og senterlinjeradius. Geometriske mål vises uten verktøytabell.",
+    "en": "Enter tube diameter and centerline radius. Geometric dimensions are shown without a tool table."
+  },
+  "Mål til de tænkte hjørner på rørets centerlinjer. Radius omregnes automatisk til de lige stykker.": {
+    "nb": "Mål til de tenkte hjørnene på rørets senterlinjer. Radius omregnes automatisk til rette stykker.",
+    "en": "Measure to the theoretical centerline vertices. The radius is automatically accounted for in the straight sections."
+  },
+  "Mål kun det lige rør mellem buernes tangentpunkter. Skift af måltype omregner eksisterende mål og bevarer rørets form.": {
+    "nb": "Mål bare det rette røret mellom buenes tangentpunkter. Endring av måletype omregner eksisterende mål og bevarer rørets form.",
+    "en": "Measure only straight tube between bend tangent points. Changing the dimension type converts existing measurements and preserves the pipe shape."
+  },
+  "Se producentens tabel og metode": {
+    "nb": "Se produsentens tabell og metode",
+    "en": "View manufacturer’s table and method"
+  },
+  "Radius måles til rørets centerlinje. Vælg måltype ovenfor, så tegningen og afsætningsmålene bruger samme målereference.": {
+    "nb": "Radius måles til rørets senterlinje. Velg måletype ovenfor slik at tegning og avsettingsmål bruker samme referanse.",
+    "en": "Radius is measured to the tube centerline. Select the dimension type above so the drawing and layout marks use the same measurement reference."
+  },
+  "Vælg en bukker under Rørindstillinger for at få afsætningsmærker efter værktøjstabel.": {
+    "nb": "Velg en rørbøyer under Rørinnstillinger for avsettingsmerker fra verktøytabellen.",
+    "en": "Select a bender in Pipe settings to calculate layout marks from its tool table."
+  },
+  "Ingen afsætningstabel for denne opsætning.": {
+    "nb": "Ingen avsettingstabell for dette oppsettet.",
+    "en": "No layout table is available for this setup."
+  },
+  "Buk": {
+    "nb": "Bøy",
+    "en": "Bend"
+  },
+  "Fradrag fra forrige buk": {
+    "nb": "Fradrag fra forrige bøy",
+    "en": "Previous bend adjustment"
+  },
+  "Mærke fra A": {
+    "nb": "Merke fra A",
+    "en": "Mark from A"
+  },
+  "Rørslut": {
+    "nb": "Rørslutt",
+    "en": "Tube end"
+  },
+  "Mærkerne måles fra ende A og bruges med producentens mærkereference. Fradraget tages én gang for det foregående buk.": {
+    "nb": "Merkene måles fra ende A og brukes med produsentens merkereferanse. Fradraget tas én gang for forrige bøy.",
+    "en": "Marks are measured from end A and used with the manufacturer’s reference marks. Apply each preceding bend adjustment once."
+  },
+  "Kaplængde efter værktøjstabel": {
+    "nb": "Kappelengde etter verktøytabell",
+    "en": "Cut length from tool table"
+  },
+  "Geometrisk rørlængde": {
+    "nb": "Geometrisk rørlengde",
+    "en": "Geometric tube length"
+  },
+  "Geometrisk centerlinjelængde": {
+    "nb": "Geometrisk senterlinjelengde",
+    "en": "Geometric centerline length"
+  },
+  "Værktøjstabellens kaplængde og den ideelle centerlinjelængde er forskellige beregningsmetoder. Brug kaplængden sammen med den valgte bukkers afsætningsmetode.": {
+    "nb": "Verktøytabellens kappelengde og ideell senterlinjelengde bruker ulike beregningsmetoder. Bruk kappelengden sammen med valgt rørbøyers avsettingsmetode.",
+    "en": "The tool-table cut length and ideal centerline length use different calculation methods. Use the cut length with the selected bender’s layout method."
+  },
+  "Producentens tabel og mærkereference": {
+    "nb": "Produsentens tabell og merkereferanse",
+    "en": "Manufacturer’s table and marking reference"
+  },
+  "Rørforslaget har ugyldige mål.": {
+    "nb": "Rørforslaget har ugyldige mål.",
+    "en": "The proposed pipe has invalid dimensions."
+  },
+  "Røret er rettet. Åbn rumplanen for at kontrollere klammer og forhindringer igen.": {
+    "nb": "Røret er endret. Åpne romplanen for å kontrollere klammer og hindringer igjen.",
+    "en": "The pipe has been edited. Reopen the room plan to check clips and obstacles again."
+  },
+  "Forslag fra rumplan. Længder og vinkler kan redigeres.": {
+    "nb": "Forslag fra romplan. Lengder og vinkler kan endres.",
+    "en": "Proposal from room plan. Lengths and angles can be edited."
+  },
+  "Udfoldet rør · afsætningsmærker fra A": {
+    "nb": "Rett rør · avsettingsmerker fra A",
+    "en": "Straight tube · layout marks from A"
+  },
+  "Udfoldet rør · geometriske referencepunkter": {
+    "nb": "Rett rør · geometriske referansepunkter",
+    "en": "Straight tube · geometric reference points"
+  },
+  "Afmærkning efter den valgte værktøjstabel. Tabellen nedenfor viser geometriske tangentpunkter.": {
+    "nb": "Avmerking etter valgt verktøytabell. Tabellen nedenfor viser geometriske tangentpunkter.",
+    "en": "Marking follows the selected tool table. The table below shows geometric tangent points."
+  },
+  "Geometriske bukkedata": {
+    "nb": "Geometriske bøyedata",
+    "en": "Geometric bend data"
+  },
+  "Afsætningsmærker fra ende A efter værktøjstabel": {
+    "nb": "Avsettingsmerker fra ende A etter verktøytabell",
+    "en": "Layout marks from end A using tool table"
+  },
+  "Geometriske tangentpunkter fra ende A": {
+    "nb": "Geometriske tangentpunkter fra ende A",
+    "en": "Geometric tangent points from end A"
   }
 };
 export const locales={da:'da-DK',nb:'nb-NO',en:'en-GB'};
