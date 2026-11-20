@@ -36,3 +36,10 @@ verify(repeated,[rectPolygon(425,270,60,18,21.8)],'50 identical anchors');
 assert.ok(polygonsOverlap(rectPolygon(0,0,20,20),rectPolygon(5,5,20,20)));
 assert.ok(!polygonsOverlap(rectPolygon(0,0,20,20),rectPolygon(100,0,20,20)));
 assert.throws(()=>placeDimensionLabels([{a:[0,0],b:[1,1],width:NaN,height:10}]));
+
+// Reject unsuitable local candidates before reserving any label space. A
+// rejected/omitted dimension must not push later accepted labels to distant rails.
+const boundedItems=[{id:'omit',a:[100,100],b:[200,100],width:70,height:24},{id:'keep',a:[100,100],b:[200,100],width:70,height:24}];
+const bounded=placeDimensionLabels(boundedItems,[],{x:0,y:0,w:300,h:300},{allowOmissions:true,acceptCandidate:p=>p.id==='keep'&&Math.abs(p.x-150)<1e-8&&Math.abs(p.y-128)<1e-8});
+assert.equal(bounded.length,1);assert.equal(bounded[0].id,'keep');assert.equal(bounded[0].x,150);assert.equal(bounded[0].y,128);
+console.log('Local candidate rejection does not reserve phantom dimension space: PASS');

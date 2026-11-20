@@ -1,6 +1,6 @@
-import {generateWallRoute,validateWallRoute,wallLayout,pointOnWall,wallObstaclePolygon} from './wall-routing.mjs?v=23';
-import {layoutWallLabels,wallSegmentFootprint,wallDirectionArrow} from './wall-label-layout.mjs?v=23';
-import {rectPolygon} from './dimension-layout.mjs';
+import {generateWallRoute,validateWallRoute,wallLayout,pointOnWall,wallObstaclePolygon} from './wall-routing.mjs?v=24';
+import {layoutWallLabels,wallSegmentFootprint,wallDirectionArrow} from './wall-label-layout.mjs?v=24';
+import {rectPolygon} from './dimension-layout.mjs?v=24';
 
 const words={
   title:['Tegn vægforløb','Tegn veggforløp','Draw the wall path'],
@@ -18,6 +18,9 @@ const words={
   toolHint:['Diameter og radius følger rørindstillingerne.','Diameter og radius følger rørinnstillingene.','Diameter and radius come from pipe settings.'],
   gap:['Fri afstand: væg → rørets yderside','Fri avstand: vegg → rørets utside','Clear distance: wall → outside of pipe'],
   clearance:['Fri afstand til forhindringer','Fri avstand til hindringer','Clearance from obstacles'],maxAngle:['Største vinkel pr. buk','Største vinkel per bøy','Maximum angle per bend'],
+  angleSplitHint:['Højst {angle}° pr. buk betyder mindst {count} buk i et 90°-hjørne. Tillad 90°-buk, hvis hjørnet skal kunne laves med ét buk. Radius og plads kontrolleres stadig.','Maks {angle}° per bøy betyr minst {count} bøyer i et 90°-hjørne. Tillat 90°-bøy hvis hjørnet skal kunne lages med én bøy. Radius og plass kontrolleres fortsatt.','A {angle}° limit means at least {count} bends at a 90° corner. Allow 90° bends to permit a single bend. Radius and available space are still checked.'],
+  angleSingleHint:['Et 90°-hjørne kan laves med ét 90°-buk, når radius og plads tillader det. Omveje ved forhindringer kan stadig bruge flere mindre buk.','Et 90°-hjørne kan lages med én 90°-bøy når radius og plass tillater det. Omveier ved hindringer kan fortsatt bruke flere mindre bøyer.','A 90° corner can use one 90° bend when the radius and available space permit it. Detours around obstacles may still use several smaller bends.'],
+  allow90:['Tillad 90°-buk og lav nyt forslag','Tillat 90°-bøy og lag nytt forslag','Allow 90° bends and recalculate'],
   start:['Start A','Start A','Start A'],end:['Slut B','Slutt B','End B'],position:['Fra vægstykkets start · mm','Fra veggstykkets start · mm','From segment start · mm'],
   positionsHint:['Placeringer måles fra starten af det valgte vægstykke, i pilens retning.','Plasseringer måles fra starten av valgt veggstykke, i pilens retning.','Measure positions from the start of the selected wall segment, in the arrow direction.'],
   placements:['3 · Klammer og forhindringer','3 · Klammer og hindringer','3 · Clips and obstacles'],clips:['Klammer','Klammer','Pipe clips'],addClip:['Tilføj klamme','Legg til klammer','Add clip'],clip:['Klamme','Klammer','Clip'],
@@ -120,6 +123,17 @@ export function roomPlannerError(result,language='da') {
 }
 
 
+/** New wall drafts allow ordinary corners in one bend; saved choices are not changed. */
+export function defaultWallPlanInput() {
+  return {wall:{lengths:[],turns:[],heading:0,side:'left'},wallGap:50,clearance:10,maxAngle:90,start:{segment:-1,position:0},end:{segment:-1,position:0},clips:[],obstacles:[]};
+}
+
+export function wallBendAngleHint(maxAngle,language='da') {
+  if(!Number.isFinite(maxAngle)||maxAngle<=0)return '';
+  const languageIndex={da:0,nb:1,en:2}[language]??0,key=maxAngle<90?'angleSplitHint':'angleSingleHint';
+  return words[key][languageIndex].replace('{angle}',String(maxAngle)).replace('{count}',String(Math.ceil(90/maxAngle)));
+}
+
 /** The host owns committing a checked pipe; this dialog owns the measured wall draft. */
 export function initRoomPlanner({getProject,onApply,language}) {
   let wall={lengths:[],turns:[],heading:0,side:'left'},draftPoints=[],result=null,returnFocus=null,seq=1,activeWall=-1,activePosition=null,opened=false,projectKey='',migrated=false;
@@ -152,7 +166,8 @@ export function initRoomPlanner({getProject,onApply,language}) {
   const sideLabel=translated('label','side',{for:'rp-side'}),side=el('select',{id:'rp-side'});side.append(translated('option','sideLeft',{value:'left'}),translated('option','sideRight',{value:'right'}));sideLabel.append(side);wallSection.append(sideLabel,translated('p','sideHint',{class:'rp-hint'}));
   const pipe=fieldset('pipe');pipe.append(el('p',{id:'rp-tool-summary',class:'rp-tool-summary'}),translated('p','toolHint',{class:'rp-hint'}));numberField(pipe,'rp-gap','gap',50);
   const pipeFields=el('div',{class:'rp-fields'});pipe.append(pipeFields);numberField(pipeFields,'rp-clearance','clearance',10);
-  const angleLabel=translated('label','maxAngle',{for:'rp-max-angle'}),angle=el('select',{id:'rp-max-angle'});for(const n of [30,45,60,90])angle.append(el('option',{value:n},n+'°'));angle.value='45';angleLabel.append(angle);pipeFields.append(angleLabel);
+  const angleLabel=translated('label','maxAngle',{for:'rp-max-angle'}),angle=el('select',{id:'rp-max-angle','aria-describedby':'rp-angle-hint'});for(const n of [30,45,60,90])angle.append(el('option',{value:n},n+'°'));angle.value='90';angleLabel.append(angle);pipeFields.append(angleLabel);
+  const angleHelp=el('div',{class:'rp-angle-help'});angleHelp.append(el('p',{id:'rp-angle-hint',class:'rp-hint','aria-live':'polite'}),button('allow90',()=>{angle.value='90';invalidate(true);if(wall.lengths.length)generate();},{id:'rp-allow-90'}));pipe.append(angleHelp);
   const endFields=el('div',{class:'rp-end-fields'});pipe.append(endFields);
   for(const key of ['start','end']){const block=el('div');block.append(translated('h3',key));const label=translated('label','wall',{for:'rp-'+key+'-wall'});label.append(segmentSelect(-1,'rp-'+key+'-wall'));block.append(label);numberField(block,'rp-'+key+'-position','position',0);endFields.append(block);}pipe.append(translated('p','positionsHint',{class:'rp-hint'}));
   const placements=fieldset('placements'),selectedLabel=translated('label','selected',{for:'rp-active-wall'});selectedLabel.append(segmentSelect(-1,'rp-active-wall'));placements.append(selectedLabel,translated('p','selectionHint',{class:'rp-hint'}));
@@ -183,7 +198,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
   function appendWall(){const lengthInput=q('rp-wall-length'),angleInput=q('rp-wall-angle');if(!lengthInput.reportValidity()||(wall.lengths.length&&!angleInput.reportValidity())){showError(tr('invalid'));return;}const length=Number(lengthInput.value),turn=Number(angleInput.value)*Number(q('rp-wall-direction').value);if(!Number.isFinite(length)||length<=0||!Number.isFinite(turn)||Math.abs(turn)>=180){showError(tr('invalid'));return;}const first=!wall.lengths.length;if(!first)wall.turns.push(turn);wall.lengths.push(length);renderWallRows();updateSegmentChoices();if(first){fillSegmentSelect(q('rp-start-wall'),0);q('rp-start-position').value=String(Math.min(200,length/4));}fillSegmentSelect(q('rp-end-wall'),wall.lengths.length-1);q('rp-end-position').value=String(length-Math.min(200,length/4));selectWall(wall.lengths.length-1);invalidate(true);}
   function removeWall(index){wall.lengths.splice(index,1);if(wall.turns.length)wall.turns.splice(index===0?0:index-1,1);updateSegmentChoices(i=>i===index?-1:i>index?i-1:i);activeWall=Number(q('rp-active-wall').value);activePosition=null;renderWallRows();invalidate(true);}
   function showError(message){error.textContent=message||'';}
-  function invalidate(clear){result=null;q('rp-apply').disabled=true;showError('');status.textContent=tr(clear?'changed':'edited');q('rp-summary').textContent='';if(clear){draftPoints=[];renderPoints();}draw();persistDraft();}
+  function invalidate(clear){updateAngleHelp();result=null;q('rp-apply').disabled=true;showError('');status.textContent=tr(clear?'changed':'edited');q('rp-summary').textContent='';if(clear){draftPoints=[];renderPoints();}draw();persistDraft();}
   function accept(next){if(!next?.ok){result=null;q('rp-apply').disabled=true;showError(roomPlannerError(next,languageValue()));status.textContent='';draw();persistDraft();return false;}result=next;draftPoints=clone(next.points);q('rp-apply').disabled=false;showError('');status.textContent=tr('validated');q('rp-summary').textContent=next.turns.length+' '+tr('bends')+' · '+tr('length')+': '+format(next.geometricLength)+' mm';renderPoints();draw();persistDraft();return true;}
   function validSettings(){return[...settings.querySelectorAll('input,select')].filter(field=>!field.closest('#rp-wall-builder')).every(field=>field.reportValidity());}
   function generate(){if(!wall.lengths.length){showError(tr('noWalls'));return;}if(!validSettings()){showError(tr('invalid'));return;}try{accept(generateWallRoute(input()));}catch{accept({ok:false,error:tr('unexpected')});}}
@@ -193,8 +208,9 @@ export function initRoomPlanner({getProject,onApply,language}) {
   function addPoint(){if(draftPoints.length<2)return;readPoints();const a=draftPoints.at(-2),b=draftPoints.at(-1);draftPoints.splice(draftPoints.length-1,0,[(a[0]+b[0])/2,(a[1]+b[1])/2]);renderPoints();invalidate(false);}
   async function apply(){if(!result?.ok||!validSettings())return;try{readPoints();const data=input(),checked=validateWallRoute(data,draftPoints);if(!accept(checked))return;q('rp-apply').disabled=true;await onApply({lengths:clone(checked.lengths),turns:clone(checked.turns),heading:checked.heading,start:clone(checked.start),planner:{version:2,input:clone(data),points:clone(checked.points)}});dialog.close();}catch(exception){showError(exception?.message||tr('rejected'));q('rp-apply').disabled=!result?.ok;}}
   function format(n){return Number(n).toLocaleString({da:'da-DK',nb:'nb-NO',en:'en-GB'}[languageValue()]||'da-DK',{maximumFractionDigits:1});}
-  function refresh(){for(const node of dialog.querySelectorAll('[data-rp-text]')){const key=node.dataset.rpText;if(node.tagName==='LABEL'){const first=node.firstChild;if(first?.nodeType===3)first.nodeValue=tr(key);else node.prepend(document.createTextNode(tr(key)));}else node.textContent=tr(key);}const p=getProject();q('rp-tool-summary').textContent=tr('diameter')+': '+format(p.diameter)+' mm · '+tr('radius')+': '+format(p.radius)+' mm';if(opened){renderWallRows();updateSegmentChoices();}if(dialog.open)draw();}
-  function defaultInput(){return{wall:{lengths:[],turns:[],heading:0,side:'left'},wallGap:50,clearance:10,maxAngle:45,start:{segment:-1,position:0},end:{segment:-1,position:0},clips:[],obstacles:[]};}
+  function updateAngleHelp(){const limit=value('rp-max-angle');q('rp-angle-hint').textContent=wallBendAngleHint(limit,languageValue());q('rp-allow-90').hidden=!Number.isFinite(limit)||limit<=0||limit>=90;}
+  function refresh(){updateAngleHelp();for(const node of dialog.querySelectorAll('[data-rp-text]')){const key=node.dataset.rpText;if(node.tagName==='LABEL'){const first=node.firstChild;if(first?.nodeType===3)first.nodeValue=tr(key);else node.prepend(document.createTextNode(tr(key)));}else node.textContent=tr(key);}const p=getProject();q('rp-tool-summary').textContent=tr('diameter')+': '+format(p.diameter)+' mm · '+tr('radius')+': '+format(p.radius)+' mm';if(opened){renderWallRows();updateSegmentChoices();}if(dialog.open)draw();}
+  function defaultInput(){return defaultWallPlanInput();}
   function open(){let savedIssue=false;const active=document.activeElement;returnFocus=active?.closest('#app-menu')?document.querySelector('#app-menu > summary'):active;const key=fingerprint(),reuse=opened&&key===projectKey;if(!reuse){const stored=storedDraft(key)||migrateRoomPlanner(getProject().planner);savedIssue=!!(stored?.error||stored?.savedError);migrated=!!stored?.migrated;writeInput(stored?.input?{...defaultInput(),...clone(stored.input)}:defaultInput());draftPoints=stored&&Array.isArray(stored.points)?clone(stored.points):[];result=null;q('rp-apply').disabled=true;status.textContent='';showError('');q('rp-summary').textContent='';}opened=true;projectKey=key;legacyNotice.hidden=!migrated;refresh();renderPoints();dialog.showModal();draw();if(draftPoints.length>=2){try{accept(validateWallRoute(input(),draftPoints));}catch{showError(tr('unexpected'));}}if(savedIssue)showError(tr('invalidSaved'));}
   function draw(){
     if(!dialog.open)return;

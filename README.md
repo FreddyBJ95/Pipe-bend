@@ -28,7 +28,7 @@ Appen installeres fra den HTTPS-adresse, GitHub Pages giver dig; en downloadet Z
 Kør `python3 -m http.server 8080` i denne mappe og åbn http://localhost:8080. Offlinebrug kræver, at appen først er indlæst fra HTTPS eller localhost, og service worker er installeret. Ingen automatisk synkronisering: gem projekt som JSON for backup eller overførsel mellem enheder. Projekter gemmes også automatisk i browserens lokale lager.
 
 ## Kontrol
-Kør `node test.mjs`, `node benders.test.mjs`, `node measurements.test.mjs`, `node wall-routing.test.mjs`, `node wall-label-layout.test.mjs`, `node wall-plan-migration.test.mjs`, `node room-routing.test.mjs`, `node dimension-layout.test.mjs`, `node bend-references.test.mjs` og `node offset-visual.test.mjs`. Testene dækker buegeometri, kompatibilitet med ældre projekter, begge målemetoder, producenttabeller, afsætningsmærker, åbne vægforløb, klammer, faktiske radiusbuer, kollisionskontrol, umulige mål og tegningens referencer.
+Kør `node test.mjs`, `node benders.test.mjs`, `node measurements.test.mjs`, `node wall-routing.test.mjs`, `node wall-planner-corners.test.mjs`, `node wall-label-layout.test.mjs`, `node wall-plan-migration.test.mjs`, `node room-routing.test.mjs`, `node dimension-layout.test.mjs`, `node bend-references.test.mjs`, `node blank-layout.test.mjs` og `node offset-visual.test.mjs`. Testene dækker buegeometri, kompatibilitet med ældre projekter, begge målemetoder, producenttabeller, afsætningsmærker, åbne vægforløb, klammer, faktiske radiusbuer, kollisionskontrol, umulige mål og tegningens referencer.
 
 ## Sprog / Språk / Language
 Vælg Norsk (bokmål), English eller Dansk øverst i appen. Valget gemmes på enheden. Sprogskift ændrer ikke projektets navn, mål eller trekantens retning.
@@ -42,11 +42,13 @@ Arbejdsvisning viser kun det gemte rør, uden den stiplede forhåndsvisning. Den
 Logo: industrielt rør med 90°-markering og orange typografi; logo.png og appikoner er inkluderet.
 
 ## Læselige referencer
-Tegningen viser L1, L2 … for lige stykker og B1, B2 … for buk. Referencerne placeres i separate kolonner med forbindelseslinjer til røret for at undgå overlappende tekst. Længder og vinkler vises i en læsbar liste under tegningen og på arbejdsarket. Tryk på en reference eller dens listeværdi for at redigere. Samme B-numre bruges i bukkelisten og på det udfoldede rør.
+Tegningen viser små B1, B2 … tæt ved bukkene. Korte henvisninger forbinder nummeret til den faktiske bue; der er ingen sidekolonner med lange forbindelseslinjer. Buk og mål under redigeringstegningen giver en samlet, trykbar liste med alle længder, vinkler og retninger. Samme B-numre bruges i arbejdsvisning, bukkeliste og på det udfoldede rør.
 
-Visningen drejes automatisk for at udnytte tegnefeltet; det ændrer ikke rørets mål eller bukkeretninger. Længder står ved de lige stykker og følger deres retning med læsbar tekstorientering. B-referencer står i separate kolonner. Ved tætte mål flyttes længdeteksterne længere væk med forbindelseslinjer; alle værdier findes også i listen nedenunder.
+Visningen drejes automatisk for at udnytte tegnefeltet; det ændrer ikke rørets mål eller bukkeretninger. Længder står ved de lige stykker, hvor der er plads, og følger deres retning med læsbar tekstorientering. Nummermærker og længdetekster placeres samlet, så de ikke dækker rør, ender eller hinanden. Meget tætte tegninger bruger den fulde liste til mål, der ikke kan placeres læseligt i tegnefeltet.
 
-Længdeteksterne viser kun tallet; alle mål på tegningen er i mm. En kollisionskontrol placerer teksten fri af røret, endepunkter, B-referencer og andre længdetekster. Forbindelseslinjer ligger bag tekstfelterne. Forhåndsvisningen ændrer ikke længere målestokken for det oprettede rør. Ved behov udvides tegningsrammen, så mål ikke beskæres.
+Længdeteksterne viser kun tallet; alle mål på tegningen er i mm. En kollisionskontrol placerer teksten fri af røret, endepunkter, B-referencer og andre længdetekster. Forbindelseslinjer ligger bag tekstfelterne. Forhåndsvisningen ændrer ikke målestokken for det oprettede rør. Mobilvisning bruger tegnefeltets faktiske bredde, så teksterne bevarer deres læsbare størrelse.
+
+Det udfoldede rør beholder mærkernes præcise placeringer og viser alle B-numre på forskudte rækker over og under røret. Hvis numrene ikke kan være der samlet, vises alle mærker med deres mål fra A i en liste direkte under oversigten. Der skjules aldrig kun hvert andet nummer. På mobil kan det udfoldede rør rulles vandret, så teksten kan læses; udskrift tilpasses sidens bredde med automatisk højde.
 
 ## Grænseflade
 Ingen slogans eller dekorative brandtekster. Ét logo i hovedmenuen. Arbejdsark og udskrift bruger kun projektnavn, mål, funktionelle overskrifter og nødvendig målevejledning.
@@ -92,5 +94,7 @@ Korte vægstykker vises med nummerreferencer, når der ikke er plads til hele m�
 Tryk på et vægstykke for at vælge det, og placér start, slut, klammer og forhindringer med et mål fra stykkets start. Vægafstand er fri afstand fra væg til rørets yderside, og hver klamme kan have sin egen afstand. Forhindringer har position, bredde langs væggen og fremspring ud fra væggen.
 
 Forslaget bruger den aktuelle diameter/radius og den valgte maksimale vinkel pr. buk. Det følger det opmålte vægforløb mellem start og slut og skal passe gennem alle klammer på lige stykker. Rørets faktiske radiusbuer kontrolleres mod de tegnede vægge og forhindringer. Der loves ikke globalt korteste rute. Tætte eller modstridende placeringer kan give en forklaring om, at intet kontrolleret forslag blev fundet.
+
+Nye vægforløb tillader som udgangspunkt 90° pr. buk, så et almindeligt retvinklet væghjørne får ét 90°-buk, når radius og plads tillader det. En grænse på 45° kræver mindst to buk for samme retningsændring. Gemte valg bevares. Tillad 90°-buk og lav nyt forslag ændrer grænsen efter et aktivt tryk og opdaterer forslaget; det eksisterende rør erstattes først ved Brug rørforslaget.
 
 Forslagets hjørnepunkter kan redigeres før brug og skal kontrolleres igen. Brug rørforslaget erstatter det aktuelle rør og kan fortrydes. Derefter kan længder/vinkler redigeres i den normale tegning. Vægforløbet gemmes med projektet; genåbning kontrollerer den seneste rørføring med de aktuelle dimensioner og klammer. Ældre rektangulære rumplaner bevarer deres vægge, klammer, forhindringer og rørføring ved konvertering til vægstykker. Ældre projekter uden måltype bliver ved med at bruge tangentlængder.

@@ -1,4 +1,20 @@
 const messages={
+  "Alle mål og buk står i listen. Tryk på en reference for at redigere.": {
+    "nb": "Alle mål og bøy står i listen. Trykk på en referanse for å redigere.",
+    "en": "All dimensions and bends are listed. Select a reference to edit it."
+  },
+  "Buk og mål": {
+    "nb": "Bøy og mål",
+    "en": "Bends and dimensions"
+  },
+  "Stryg til siden for at se hele røret.": {
+    "nb": "Sveip til siden for å se hele røret.",
+    "en": "Swipe sideways to see the full tube."
+  },
+  "Alle mærker fra A": {
+    "nb": "Alle merker fra A",
+    "en": "All marks from A"
+  },
   "Tegningsnummer": {
     "nb": "Tegningsnummer",
     "en": "Drawing number"

@@ -59,7 +59,7 @@ function readableAngle(a, b) {
  * Returned polygons have >=6 SVG units separation from all obstacles/labels.
  * Bounds are preferred, not clipped: if crowded, labels can expand outside them.
  */
-export function placeDimensionLabels(items, obstacles = [], bounds = { x: 0, y: 0, w: 900, h: 540 }) {
+export function placeDimensionLabels(items, obstacles = [], bounds = { x: 0, y: 0, w: 900, h: 540 }, options = {}) {
   const blocked = obstacles.map(o => shape(Array.isArray(o) ? o : o.polygon));
   const results = [];
   const centerX = bounds.x + bounds.w / 2, centerY = bounds.y + bounds.h / 2;
@@ -80,6 +80,7 @@ export function placeDimensionLabels(items, obstacles = [], bounds = { x: 0, y: 
       const candidate = shape(rectPolygon(x, y, item.width, item.height, angle));
       if (blocked.some(obstacle => overlapShapes(candidate, obstacle, GAP))) return;
       const b = candidate.box;
+      if (options.acceptCandidate && !options.acceptCandidate({...item,x,y,angle,polygon:candidate.polygon,box:b,offset,along},results)) return;
       const outside = Math.max(0, bounds.x - b.x) + Math.max(0, b.x + b.w - bounds.x - bounds.w) +
         Math.max(0, bounds.y - b.y) + Math.max(0, b.y + b.h - bounds.y - bounds.h);
       const score = (outside ? 1e7 + outside * 100 : 0) + Math.abs(offset) + Math.abs(along) * 1.35 +
@@ -94,7 +95,7 @@ export function placeDimensionLabels(items, obstacles = [], bounds = { x: 0, y: 
 
     // Broaden the search when no in-bounds placement is available. Each candidate
     // is still rejected on any collision; we never choose a colliding fallback.
-    if (!best || best.score >= 1e7) {
+    if ((!best || best.score >= 1e7) && !options.allowOmissions) {
       for (let ring = 1; ring <= 4; ring++) {
         const distance = 260 + ring * 100;
         for (const offset of [distance, -distance]) for (const along of [0, distance / 2, -distance / 2, distance, -distance]) {
@@ -104,18 +105,21 @@ export function placeDimensionLabels(items, obstacles = [], bounds = { x: 0, y: 
       }
     }
 
-    if (!best) {
+    if (!best && !options.allowOmissions) {
       // A finite set of finite polygons cannot block a point beyond its rightmost
       // bound. This provides deterministic termination for arbitrarily dense input.
       const extentX = (Math.abs(Math.cos(radians(angle))) * item.width + Math.abs(Math.sin(radians(angle))) * item.height) / 2;
       const x = farRight + GAP * 2 + extentX, y = my;
       consider(x, y, (x - mx) * nx + (y - my) * ny, (x - mx) * ux + (y - my) * uy);
     }
+    if (!best && options.allowOmissions) continue;
     if (!best) throw new Error('Unable to place a finite dimension label.');
     blocked.push(best.shape);
     farRight = Math.max(farRight, best.box.x + best.box.w);
     const { score, shape: ignored, ...placement } = best;
-    results.push({ ...item, ...placement });
+    const result = { ...item, ...placement };
+    results.push(result);
+    for (const polygon of options.extraObstacles?.(result) || []) blocked.push(shape(polygon));
   }
   return results;
 }

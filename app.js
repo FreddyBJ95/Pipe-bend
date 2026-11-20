@@ -1,12 +1,13 @@
-import {initAppSharing} from './share-app.mjs?v=23';
+import {initAppSharing} from './share-app.mjs?v=24';
 import {SWAGELOK_BENDERS,getBender} from './benders.mjs';
 import {measurementMode,validateMeasurements,convertMeasurementMode,bendMarkLayout} from './measurements.mjs';
-import {initRoomPlanner} from './room-planner.mjs?v=23';
+import {initRoomPlanner} from './room-planner.mjs?v=24';
 import {renderOffsetVisualization} from './offset-visual.mjs';
-import {initTypography} from './typography.mjs';
-import {placeDimensionLabels} from './dimension-layout.mjs';
-import {bendReferenceLayout,bestDrawingAngle,readableTextAngle} from './labels.mjs?v=23';
-import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs';
+import {initTypography} from './typography.mjs?v=24';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=24';
+import {layoutBlankMarks} from './blank-layout.mjs?v=24';
+import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=24';
+import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=24';
 import{geometry,extend,triangle,practicalOffsetLength,calculate}from'./geometry.mjs';
 const $=id=>document.getElementById(id),fmt=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:getBender(state.benderId)?.nativeUnits==='in'?3:1}):'—';
 function newDrawingNumber(){const d=new Date(),date=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('');return 'PB-'+date+'-'+crypto.randomUUID().slice(0,6).toUpperCase();}
@@ -19,7 +20,7 @@ try{const s=JSON.parse(localStorage.getItem('pipe-bend-v1'));if(valid(s))state=n
 function sync(){for(const k of['name','stock','diameter','wall','radius'])$(k).value=state[k];$('drawing-number').value=state.drawingNumber||state.name;if($('bender-select')){$('bender-select').value=state.benderId||'';$('measurement-mode').value=measurementMode(state);updateBenderFields();}}function save(){try{localStorage.setItem('pipe-bend-v1',JSON.stringify(state));}catch{storageOK=false;}}function commit(n,roomApplied=false){const error=validateMeasurements(n);if(error)throw new RangeError(error);if(n.planner){const geo=geometry(measurementMode(n)==='vertex'?n:convertMeasurementMode(n,'vertex')),changed=!!state.planner&&!roomApplied&&JSON.stringify([state.lengths,state.turns,state.radius,state.diameter,state.heading,state.measurementMode])!==JSON.stringify([n.lengths,n.turns,n.radius,n.diameter,n.heading,n.measurementMode]),start=n.placement?.start||n.planner.points?.[0]||[0,0],points=[geo.lines[0]?.dimensionStart||geo.start,...geo.lines.map(line=>line.dimensionEnd||line.end)].map(p=>[p[0]+start[0],p[1]+start[1]]);n.planner={...n.planner,routeEdited:roomApplied?false:(changed||!!n.planner.routeEdited),points,input:{...n.planner.input,diameter:n.diameter,radius:n.radius}};}history.push(structuredClone(state));state=n;save();sync();render();}function params(){return{length:Number($('length').value)*Number($('unit').value),turn:Number($('angle').value)*sign};}function ready(){const p=params();return Number.isFinite(p.length)&&p.length>0&&Number.isFinite(p.turn)&&Math.abs(p.turn)>0&&Math.abs(p.turn)<=179;}
 function render(){
  const g=geometry(state),has=state.lengths.length>0,marks=bendMarkLayout(state,getBender(state.benderId)),material=marks.supported&&has?marks.endPosition:g.used,left=state.stock-material;
- $('empty').style.display=has?'none':'flex';$('drawing-title').textContent=state.name;$('bend-fields').hidden=!has;
+ $('empty').style.display=has?'none':'flex';$('drawing-reference-details').hidden=!has;$('drawing-title').textContent=state.name;$('bend-fields').hidden=!has;
  $('editor-title').textContent=has?t('Fortsæt fra ende ')+end:t('Start med første stykke');
  $('editor-help').textContent=has?t('Vælg vinkel og længde. Spejlvend bukket for at vælge den anden side.'):t('Tilføj første længde, og tryk derefter på ende A eller B.');
  $('add').textContent=!state.configured?t('Opret rør'):has?t('Tilføj buk & stykke'):t('Tilføj første stykke');
@@ -38,58 +39,87 @@ function render(){
 
 function draw(g,preview,target=$('drawing'),work=false){
  const svg=target;svg.replaceChildren();
- const setBounds=b=>{if(work){svg.setAttribute('viewBox',`${b.x} ${b.y} ${b.w} ${b.h}`);return;}const cx=b.x+b.w/2,cy=b.y+b.h/2;camera.x+=cx-camera.baseX;camera.y+=cy-camera.baseY;Object.assign(camera,{width:b.w,height:b.h,baseX:cx,baseY:cy});applyCamera();};
- if(!g.lines.length){setBounds({x:0,y:0,w:900,h:540});return;}
- const pageHeight=work?1200:540,plotWidth=work?640:600,plotHeight=work?1000:320;
- const angle=bestDrawingAngle(g.points,plotWidth,plotHeight),c=Math.cos(angle),sn=Math.sin(angle),rotate=p=>[p[0]*c-p[1]*sn,p[0]*sn+p[1]*c],rotated=g.points.map(rotate),xs=rotated.map(p=>p[0]),ys=rotated.map(p=>p[1]),minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys),scale=Math.min(plotWidth/Math.max(1,maxx-minx),plotHeight/Math.max(1,maxy-miny));
- const base=p=>{const q=rotate(p);return[450+(q[0]-(minx+maxx)/2)*scale,(work?600:255)-(q[1]-(miny+maxy)/2)*scale];};
- const layout=bendReferenceLayout(g.arcs,base,{height:pageHeight}),P=layout.project;
+ const width=work?900:Math.max(280,svg.clientWidth||900),pageHeight=work?1200:Math.max(430,Math.min(540,width*.65));
+ if(!work)svg.setAttribute('height',String(pageHeight));
+ const setBounds=()=>{if(work){svg.setAttribute('viewBox',`0 0 ${width} ${pageHeight}`);return;}const cx=width/2,cy=pageHeight/2;camera.x+=cx-camera.baseX;camera.y+=cy-camera.baseY;Object.assign(camera,{width,height:pageHeight,baseX:cx,baseY:cy});applyCamera();};
+ if(!g.lines.length){setBounds();if(!work&&$('drawing-references'))renderReferences(g,$('drawing-references'));return;}
+ const plotWidth=width-(work?150:112),plotHeight=pageHeight-(work?150:112),angle=bestDrawingAngle(g.points,plotWidth,plotHeight),c=Math.cos(angle),sn=Math.sin(angle),rotate=p=>[p[0]*c-p[1]*sn,p[0]*sn+p[1]*c],rotated=g.points.map(rotate),xs=rotated.map(p=>p[0]),ys=rotated.map(p=>p[1]),minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys),scale=Math.min(plotWidth/Math.max(1,maxx-minx),plotHeight/Math.max(1,maxy-miny));
+ const P=p=>{const q=rotate(p);return[width/2+(q[0]-(minx+maxx)/2)*scale,pageHeight/2-(q[1]-(miny+maxy)/2)*scale];};
  function el(tag,attrs,parent=svg){const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);parent.append(e);return e;}
- // All leaders sit behind all label backgrounds and text.
  const pipes=el('g',{'data-layer':'pipe'}),leaders=el('g',{'data-layer':'leaders'}),labels=el('g',{'data-layer':'labels'}),ends=el('g',{'data-layer':'endpoints'});
  function path(geo,attrs,delta=[0,0]){let d='';const pp=p=>P([p[0]+delta[0],p[1]+delta[1]]).join(',');geo.lines.forEach((l,i)=>{if(!i)d+='M'+pp(l.start);d+='L'+pp(l.end);if(geo.arcs[i])for(const p of geo.arcs[i].samples)d+='L'+pp(p);});el('path',{d,fill:'none','stroke-linecap':'round','stroke-linejoin':'round',...attrs},pipes);}
  if(preview){let shift=[0,0];if(end==='A'){const p=preview.lines[1].start;shift=[-p[0],-p[1]];}path(preview,{stroke:'#97c6b0','stroke-width':2,'stroke-dasharray':'8 8',opacity:.6},shift);}
  path(g,{stroke:'#9db6ab','stroke-width':14});path(g,{stroke:'#deeee7','stroke-width':9});path(g,{stroke:'#487b69','stroke-width':1,'stroke-dasharray':'4 5'});
- const rect=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]],obstacles=[];
- const segmentObstacle=(a,b,padding=10)=>{const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy)||1,nx=-dy/len*padding,ny=dx/len*padding;return[[a[0]+nx,a[1]+ny],[b[0]+nx,b[1]+ny],[b[0]-nx,b[1]-ny],[a[0]-nx,a[1]-ny]];};
- for(const l of g.lines)obstacles.push(segmentObstacle(P(l.start),P(l.end)));
- for(const arc of g.arcs)for(let j=0;j<arc.samples.length-1;j+=4)obstacles.push(segmentObstacle(P(arc.samples[j]),P(arc.samples[Math.min(j+4,arc.samples.length-1)])));
- for(const point of[P(g.start),P(g.end)])obstacles.push(rect(point[0]-25,point[1]-25,50,50));
- const badgeWidth=work?112:54;
- for(const ref of layout.labels){
-  obstacles.push(rect(ref.labelX-badgeWidth/2-4,ref.labelY-18,badgeWidth+8,36));
-  const edge=ref.labelX+(ref.side?-1:1)*badgeWidth/2,rail=edge+(ref.side?-8:8);
-  el('polyline',{'data-bend':ref.id,points:`${ref.x},${ref.y} ${rail},${ref.y} ${rail},${ref.labelY} ${edge},${ref.labelY}`,fill:'none',stroke:'#d0a17b','stroke-width':1.1},leaders);
-  el('circle',{'data-bend':ref.id,cx:ref.x,cy:ref.y,r:3.5,fill:'#ae5c15',stroke:'white','stroke-width':1},leaders);
-  const badge=el('g',{'data-reference':ref.id,class:'reference-badge'},labels);
-  el('rect',{x:ref.labelX-badgeWidth/2,y:ref.labelY-14,width:badgeWidth,height:28,rx:6,fill:'#fff2e4',stroke:'#ae5c15','stroke-width':1.2},badge);
-  el('text',{x:ref.labelX,y:ref.labelY+5,'font-family':'var(--app-font, sans-serif)','font-size':16,'font-weight':700,'text-anchor':'middle',fill:'#ae5c15'},badge).textContent=work?ref.id+' · '+fmt(Math.abs(g.arcs[ref.index].turn))+'°':ref.id;
-  if(!work)makeEditable(badge,'angle',ref.index);
- }
- const fontSize=work?18:Math.max(18,Math.min(36,16*900/Math.max(320,svg.clientWidth||900))),metrics=document.createElement('canvas').getContext('2d');metrics.font=`600 ${fontSize}px ${getComputedStyle(svg).fontFamily}`;
- const items=g.lines.map((line,index)=>{const a=P(line.dimensionStart||line.start),b=P(line.dimensionEnd||line.end),text=fmt(line.dimension??line.length)+(work?' mm':'');return{id:'L'+(index+1),index,a,b,text,width:Math.ceil(metrics.measureText(text).width)+20,height:fontSize+12,angle:readableTextAngle(b[0]-a[0],b[1]-a[1])};});
- const placed=placeDimensionLabels(items,obstacles,{x:145,y:20,w:610,h:layout.height-60});
- const pagePoints=g.points.map(P);
- let bx=work?Math.min(...pagePoints.map(p=>p[0]))-28:0,by=work?Math.min(...pagePoints.map(p=>p[1]))-28:0,br=work?Math.max(...pagePoints.map(p=>p[0]))+28:900,bb=work?Math.max(...pagePoints.map(p=>p[1]))+28:layout.height;
- if(work)for(const ref of layout.labels){bx=Math.min(bx,ref.labelX-badgeWidth/2-18);br=Math.max(br,ref.labelX+badgeWidth/2+18);by=Math.min(by,ref.labelY-30);bb=Math.max(bb,ref.labelY+30);}
+ if(!work)for(let index=0;index<g.lines.length;index++){const a=P(g.lines[index].start),b=P(g.lines[index].end);el('line',{'data-length-id':'L'+(index+1),class:'reference-path',x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:'#278f70','stroke-width':20,'stroke-linecap':'round','pointer-events':'none',opacity:0},pipes);}
+ const rect=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
+ const footprint=(a,b,padding=8)=>{const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy)||1,nx=-dy/len*padding,ny=dx/len*padding;return[[a[0]+nx,a[1]+ny],[b[0]+nx,b[1]+ny],[b[0]-nx,b[1]-ny],[a[0]-nx,a[1]-ny]];};
+ const pipe=[];
+ for(const line of g.lines)pipe.push({polygon:footprint(P(line.start),P(line.end))});
+ for(let index=0;index<g.arcs.length;index++){const arc=g.arcs[index];for(let j=0;j<arc.samples.length-1;j+=4)pipe.push({index,polygon:footprint(P(arc.samples[j]),P(arc.samples[Math.min(j+4,arc.samples.length-1)]))});}
+ const endpointObstacles=[P(g.start),P(g.end)].map(p=>rect(p[0]-23,p[1]-23,46,46));
+ const layout=bendReferenceLayout(g.arcs,P,{width,height:pageHeight,fontSize:work?18:13,obstacles:endpointObstacles,pipe,maxLeader:28});
+ const obstacles=[...pipe.map(p=>p.polygon),...endpointObstacles,...layout.labels.map(p=>p.polygon),...layout.labels.map(p=>footprint(...p.leader,2))];
+ const fontSize=work?18:14,metrics=document.createElement('canvas').getContext('2d');metrics.font=`600 ${fontSize}px ${getComputedStyle(svg).fontFamily}`;
+ const items=g.lines.map((line,index)=>{const a=P(line.start),b=P(line.end),text=fmt(line.dimension??line.length)+(work?' mm':'');return{id:'L'+(index+1),index,a,b,text,width:Math.ceil(metrics.measureText(text).width)+14,height:fontSize+10,angle:readableTextAngle(b[0]-a[0],b[1]-a[1])};});
+ const crosses=(a,b,c,d)=>{const u=[b[0]-a[0],b[1]-a[1]],v=[d[0]-c[0],d[1]-c[1]],w=[c[0]-a[0],c[1]-a[1]],det=u[0]*v[1]-u[1]*v[0];if(Math.abs(det)<1e-8)return false;const t=(w[0]*v[1]-w[1]*v[0])/det,q=(w[0]*u[1]-w[1]*u[0])/det;return t>1e-5&&t<1-1e-5&&q>1e-5&&q<1-1e-5;};
+ const hits=(a,b,polygon)=>{const inside=p=>{const signs=polygon.map((v,i)=>{const q=polygon[(i+1)%polygon.length];return(q[0]-v[0])*(p[1]-v[1])-(q[1]-v[1])*(p[0]-v[0]);});return signs.every(n=>n>=0)||signs.every(n=>n<=0);};return inside(a)||inside(b)||polygon.some((p,i)=>crosses(a,b,p,polygon[(i+1)%polygon.length]));};
+ const dimensionLeader=dim=>{const start=[(dim.a[0]+dim.b[0])/2,(dim.a[1]+dim.b[1])/2],dx=start[0]-dim.x,dy=start[1]-dim.y,angle=dim.angle*Math.PI/180,localX=dx*Math.cos(angle)+dy*Math.sin(angle),localY=-dx*Math.sin(angle)+dy*Math.cos(angle),factor=Math.min(1,dim.width/2/Math.max(1e-8,Math.abs(localX)),dim.height/2/Math.max(1e-8,Math.abs(localY)));return[start,[dim.x+dx*factor,dim.y+dy*factor]];};
+ const placed=placeDimensionLabels(items,obstacles,{x:12,y:12,w:width-24,h:pageHeight-24},{allowOmissions:true,acceptCandidate:(dim,accepted)=>{
+  if(dim.box.x<10||dim.box.y<10||dim.box.x+dim.box.w>width-10||dim.box.y+dim.box.h>pageHeight-10)return false;
+  const [start,finish]=dimensionLeader(dim),length=Math.hypot(start[0]-finish[0],start[1]-finish[1]);
+  if(length>(work?64:42)||Math.hypot(start[0]-dim.x,start[1]-dim.y)>(work?100:66)||leaderCrossesPipe(start,finish,pipe))return false;
+  return !layout.labels.some(p=>hits(start,finish,p.polygon))&&!accepted.some(p=>hits(start,finish,p.polygon)||crosses(start,finish,...dimensionLeader(p)))&&!layout.labels.some(p=>crosses(start,finish,...p.leader));
+ },extraObstacles:dim=>[footprint(...dimensionLeader(dim),2)]}).map(dim=>({...dim,leader:dimensionLeader(dim)}));
  for(const dim of placed){
-  bx=Math.min(bx,dim.box.x-22);by=Math.min(by,dim.box.y-22);br=Math.max(br,dim.box.x+dim.box.w+22);bb=Math.max(bb,dim.box.y+dim.box.h+42);
-  const midpoint=[(dim.a[0]+dim.b[0])/2,(dim.a[1]+dim.b[1])/2];
-  el('line',{x1:midpoint[0],y1:midpoint[1],x2:dim.x,y2:dim.y,stroke:'#8ca697','stroke-width':1},leaders);
+  const [a,b]=dim.leader;
+  el('line',{'data-length-leader':dim.id,x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:'#8ca697','stroke-width':1},leaders);
   const group=el('g',{'data-length':dim.id,transform:`translate(${dim.x} ${dim.y}) rotate(${dim.angle})`,class:'length-dimension'},labels);
   el('title',{},group).textContent=dim.id+' · '+dim.text+(work?'':' mm');
-  el('rect',{x:-dim.width/2,y:-dim.height/2,width:dim.width,height:dim.height,rx:5,fill:'#ffffff'},group);
+  el('rect',{x:-dim.width/2,y:-dim.height/2,width:dim.width,height:dim.height,rx:4,fill:'#ffffff'},group);
   el('text',{x:0,y:fontSize*.34,'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':fontSize,'font-weight':600,fill:'#176748'},group).textContent=dim.text;
   if(!work){makeEditable(group,'length',dim.index);group.setAttribute('aria-label',dim.id+' · '+dim.text+' mm');}
+ }
+ // Tiny local references replace the former page-wide orange rails.
+ for(const ref of layout.labels){
+  const [a,b]=ref.leader;el('line',{'data-bend-leader':ref.id,x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:'#bd763a','stroke-width':1},leaders);
+  const badge=el('g',{'data-reference':ref.id,'data-bend-id':ref.id,class:'reference-badge'},labels);
+  el('rect',{x:ref.labelX-ref.width/2,y:ref.labelY-ref.height/2,width:ref.width,height:ref.height,rx:ref.height/2,fill:'#fff4e8',stroke:'#ae5c15','stroke-width':1},badge);
+  el('text',{x:ref.labelX,y:ref.labelY+ref.fontSize*.34,'font-family':'var(--app-font, sans-serif)','font-size':ref.fontSize,'font-weight':600,'text-anchor':'middle',fill:'#994c0c'},badge).textContent=ref.id;
+  el('title',{},badge).textContent=ref.id+' · '+fmt(Math.abs(g.arcs[ref.index].turn))+'° · '+t(g.arcs[ref.index].turn>0?'Venstre':'Højre');
+  if(!work)makeEditable(badge,'angle',ref.index);
+ }
+ for(const ref of layout.anchors){
+  const anchor=el('g',{'data-bend-id':ref.id,'data-bend-anchor':ref.id,class:'bend-anchor'},labels);
+  if(!work)el('circle',{cx:ref.x,cy:ref.y,r:10,fill:'transparent'},anchor);
+  el('circle',{'data-bend':ref.id,cx:ref.x,cy:ref.y,r:2.5,fill:'#ae5c15',stroke:'white','stroke-width':1},anchor);
+  el('title',{},anchor).textContent=ref.id+' · '+fmt(Math.abs(g.arcs[ref.index].turn))+'°';
+  if(!work)makeEditable(anchor,'angle',ref.index);
  }
  for(const[label,p]of[['A',g.start],['B',g.end]]){
   const q=P(p),e=el('g',{class:'endpoint'},ends);el('circle',{cx:q[0],cy:q[1],r:23,fill:'transparent'},e);el('circle',{cx:q[0],cy:q[1],r:16,fill:label===end?'#16815d':'#183c36',stroke:'white','stroke-width':3},e);el('text',{x:q[0],y:q[1]+5,fill:'white','font-size':14,'font-weight':700,'text-anchor':'middle'},e).textContent=label;
   if(work)continue;e.setAttribute('role','button');e.setAttribute('tabindex','0');e.setAttribute('aria-label',t('Tilføj buk ved ende ')+label);const select=()=>{end=label;render();$('angle').scrollIntoView({behavior:'smooth',block:'center'});$('angle').focus({preventScroll:true});};e.onclick=select;e.onkeydown=k=>{if(k.key==='Enter'||k.key===' '){k.preventDefault();select();}};
  }
- setBounds({x:bx,y:by,w:br-bx,h:bb-by});
+ svg.setAttribute('data-inline-bends',String(layout.labels.length));svg.setAttribute('data-total-bends',String(g.arcs.length));
+ setBounds();if(!work&&$('drawing-references'))renderReferences(g,$('drawing-references'));
 }
 
-function renderReferences(g,container,work=false){container.replaceChildren();for(const type of ['length','angle']){const col=document.createElement('section'),heading=document.createElement('h3');heading.textContent=t(type==='length'?'Længder':'Bukkevinkler');col.append(heading);const list=type==='length'?g.lines:g.arcs;for(let i=0;i<list.length;i++){const item=list[i],row=document.createElement(work?'div':'button');row.className='reference-row';const id=(type==='length'?'L':'B')+(i+1),ref=document.createElement('strong'),value=document.createElement('span');ref.className=type==='angle'?'bend-ref':'length-ref';ref.textContent=id;value.textContent=type==='length'?fmt(item.dimension??item.length)+' mm':fmt(Math.abs(item.turn))+'° · '+t(item.turn>0?'Venstre':'Højre');row.append(ref,value);if(!work){row.type='button';row.setAttribute('aria-label',id+' · '+value.textContent);row.onclick=()=>openEdit(type,i);}col.append(row);}container.append(col);}container.hidden=!g.lines.length;}
+function renderReferences(g,container,work=false){
+ container.replaceChildren();
+ function highlight(id){for(const selector of ['[data-bend-id]','[data-length-id]'])for(const node of $('drawing').querySelectorAll(selector))node.classList.toggle('reference-selected',(node.getAttribute('data-bend-id')||node.getAttribute('data-length-id'))===id);}
+ for(const type of ['length','angle']){
+  const col=document.createElement('section'),heading=document.createElement('h3');heading.textContent=t(type==='length'?'Længder':'Bukkevinkler');col.append(heading);
+  const list=type==='length'?g.lines:g.arcs;
+  for(let i=0;i<list.length;i++){
+   const item=list[i],row=document.createElement(work?'div':'button');row.className='reference-row';
+   const id=(type==='length'?'L':'B')+(i+1),ref=document.createElement('strong'),value=document.createElement('span');ref.className=type==='angle'?'bend-ref':'length-ref';ref.textContent=id;value.textContent=type==='length'?fmt(item.dimension??item.length)+' mm':fmt(Math.abs(item.turn))+'° · '+t(item.turn>0?'Venstre':'Højre');row.append(ref,value);row.setAttribute('data-reference-row',id);
+   if(!work){row.type='button';row.setAttribute('aria-label',id+' · '+value.textContent);row.onfocus=()=>highlight(id);row.onmouseenter=()=>highlight(id);row.onclick=()=>{highlight(id);openEdit(type,i);};}
+   col.append(row);
+  }
+  container.append(col);
+ }
+ container.hidden=!g.lines.length;
+ if(!work&&$('drawing-reference-details'))$('drawing-reference-details').hidden=!g.lines.length;
+}
 
 function initBenderChoices(){
  const select=$('bender-select');
@@ -202,19 +232,30 @@ function renderWork(){
  drawBlank(g,marks);$('work-svg').disabled=!g.lines.length;
 }
 function drawBlank(g,marks){
- const svg=$('work-blank');svg.replaceChildren();if(!g.lines.length)return;
- function el(tag,attrs,text){const node=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const[k,v]of Object.entries(attrs))node.setAttribute(k,v);if(text)node.textContent=text;svg.append(node);return node;}
- const practical=marks.supported,total=practical?marks.endPosition:g.used,scale=800/total;
- el('rect',{x:50,y:45,width:800,height:22,rx:5,fill:'#e3ebe8',stroke:'#617e73'});
- el('text',{x:50,y:26,'font-size':15,fill:'#183037'},'A · 0 mm');
- el('text',{x:850,y:26,'text-anchor':'end','font-size':15,fill:'#183037'},'B · '+fmt(total)+' mm');
- const entries=practical?marks.marks.map(mark=>({position:mark.position,id:mark.id})):g.arcs.map((arc,i)=>({position:arc.position,id:'B'+(i+1),arc}));
- const stride=Math.max(1,Math.ceil(entries.length/10));
- entries.forEach((entry,i)=>{const x=50+entry.position*scale;
-  if(entry.arc)el('rect',{x,y:45,width:Math.max(1,state.radius*Math.abs(entry.arc.turn)*Math.PI/180*scale),height:22,fill:'#f2943a'});
-  el('line',{x1:x,y1:38,x2:x,y2:80,stroke:'#9c5719','stroke-width':1.5});
-  if(i%stride===0||i===entries.length-1)el('text',{x,y:98+(Math.floor(i/stride)%2)*19,'font-size':14,'text-anchor':'middle',fill:'#183037'},entry.id);
- });
+ const svg=$('work-blank'),grid=$('work-blank-grid');svg.replaceChildren();grid.replaceChildren();grid.hidden=true;svg.parentElement.hidden=!g.lines.length;document.querySelector('.blank-scroll-hint').hidden=!g.lines.length;if(!g.lines.length)return;
+ function el(tag,attrs,text){const node=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const[k,v]of Object.entries(attrs))node.setAttribute(k,v);if(text!==undefined)node.textContent=text;svg.append(node);return node;}
+ const practical=marks.supported,total=practical?marks.endPosition:g.used;
+ const entries=practical?marks.marks.map(mark=>({position:mark.position,id:mark.id,valueText:fmt(mark.position)+' mm'})):g.arcs.map((arc,i)=>({position:arc.position,id:'B'+(i+1),valueText:fmt(arc.position)+' mm',arcLength:state.radius*Math.abs(arc.turn)*Math.PI/180}));
+ const layout=layoutBlankMarks(entries,{totalLength:total,width:900,margin:40,fontSize:14});svg.setAttribute('viewBox',`0 0 ${layout.width} ${layout.height}`);svg.setAttribute('font-family','var(--app-font, sans-serif)');
+ const tube=layout.tube,scale=tube.width/total;
+ el('rect',{x:tube.x,y:tube.y,width:tube.width,height:tube.height,rx:5,fill:'#e3ebe8',stroke:'#617e73'});
+ el('text',{x:tube.x,y:18,'font-size':14,fill:'#183037'},'A · 0 mm');
+ el('text',{x:tube.x+tube.width,y:18,'text-anchor':'end','font-size':14,fill:'#183037'},'B · '+fmt(total)+' mm');
+ for(const tick of layout.ticks){
+  if(tick.arcLength)el('rect',{x:tick.x,y:tube.y,width:tick.arcLength*scale,height:tube.height,fill:'#f2943a',opacity:.5});
+  const line=el('line',{'data-mark':tick.id,x1:tick.x,y1:tick.y1,x2:tick.x,y2:tick.y2,stroke:'#9c5719','stroke-width':1.5});
+  const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=tick.id+' · '+tick.valueText;line.append(title);
+ }
+ for(const label of layout.labels){
+  const [a,b]=label.leader;el('line',{x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:'#b57b45','stroke-width':1});
+  el('rect',{x:label.box.x,y:label.box.y,width:label.box.width,height:label.box.height,rx:4,fill:'#fff8f0',stroke:'#d6b99c','stroke-width':.7});
+  const text=el('text',{'data-mark-label':label.id,x:label.x,y:label.y+4.5,'font-size':layout.fontSize,'font-weight':600,'text-anchor':'middle',fill:'#804719'},label.id);
+  const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=label.id+' · '+label.valueText;text.append(title);
+ }
+ if(layout.mode==='table'){
+  grid.hidden=false;grid.setAttribute('aria-label',t('Alle mærker fra A'));
+  for(const entry of layout.entries){const row=document.createElement('div'),id=document.createElement('strong'),value=document.createElement('span');row.setAttribute('data-mark',entry.id);id.textContent=entry.id;value.textContent=entry.valueText;row.append(id,value);grid.append(row);}
+ }
  svg.setAttribute('aria-label',t(practical?'Afsætningsmærker fra ende A efter værktøjstabel':'Geometriske tangentpunkter fra ende A'));
 }
 function openWork(){renderWork();document.body.classList.add('work-mode');$('work-sheet').hidden=false;window.scrollTo(0,0);$('work-close').focus({preventScroll:true});}
@@ -275,4 +316,9 @@ const roomPlanner=initRoomPlanner({getProject:()=>state,language:()=>language,t,
  $('drawing').scrollIntoView({block:'center',behavior:'smooth'});
 }});
 for(const id of ['room-open','room-open-menu'])$(id).onclick=()=>roomPlanner.open();
+let drawingObservedWidth=$('drawing').clientWidth;
+if(typeof ResizeObserver==='function')new ResizeObserver(()=>{
+ const width=$('drawing').clientWidth;
+ if(width>0&&Math.abs(width-drawingObservedWidth)>1){drawingObservedWidth=width;requestAnimationFrame(()=>render());}
+}).observe($('drawing'));
 if(!state.configured)openPipeSettings('new');
