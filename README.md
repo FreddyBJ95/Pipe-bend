@@ -6,11 +6,11 @@ Dansk PWA til planlægning af rørbuk. Ingen konto eller eksterne biblioteker.
 2. Indtast første længde, fx 10 cm. Fortsæt fra A eller B med vinkel og næste mål.
 3. Færdigmål går til de tænkte hjørner på rørenes centerlinjer. Lige længder går mellem buernes tangentpunkter. Skift af måltype omregner eksisterende værdier uden at ændre rørets form.
 4. Spejlvend vælger venstre eller højre ud fra den valgte ende. Umuligt korte stykker afvises, også i forhåndsvisningen.
-5. Afsætningsmål viser mærker fra A, fradrag fra det foregående buk og kaplængde efter det valgte værktøjs tabel. Fortryd virker også efter anvendelse af et rumforslag.
+5. Afsætningsmål viser mærker fra A, fradrag fra det foregående buk og kaplængde efter det valgte værktøjs tabel. Fortryd virker også efter anvendelse af et vægforslag.
 
 Den ideelle centerlinjegeometri beregnes med tangentlængder plus cirkelbuer. Afsætningsmærker og kaplængde efter producentens værktøjstabel er en separat, praktisk mærkemetode. Begge værdier vises med tydelige betegnelser; geometriske tangentpunkter kaldes ikke bukkemærker. Materialeoversigten bruger værktøjstabellens kaplængde, når hele opsætningen understøttes, ellers den geometriske længde.
 
-Rørmodellen arbejder i ét plan (2D). Rumplanlæggeren kontrollerer rørets yderside mod vægge, forhindringer, andre dele af samme rør samt klammer på de lige stykker. Der modelleres ikke højdeskift, rotation mellem bukkeplaner, materialedeformation, fjederretur eller savsnit. Brug producentens mærkereference og kontrollér den valgte opsætning mod et prøvebuk.
+Rørmodellen arbejder i ét plan (2D). Vægplanlæggeren kontrollerer rørets yderside mod de tegnede vægge, forhindringer, andre dele af samme rør samt klammer på de lige stykker. Der modelleres ikke højdeskift, rotation mellem bukkeplaner, materialedeformation, fjederretur eller savsnit. Brug producentens mærkereference og kontrollér den valgte opsætning mod et prøvebuk.
 
 Pythagoras finder en ukendt side i en retvinklet trekant. Tryk Vis trekant for at se en tegning med sidelængder og grøn markering af den beregnede side. Tegningen følger indtastningerne. Drej 90° og Spejlvend tilpasser orienteringen uden at ændre sider eller beregning. Nulstil retning gendanner standardvisningen. Forskydningsværktøjet bruger den praktiske mærkeafstand: ønsket forskydning × faktor. Ved 45° er standardfaktoren 1,4 (afrundet), fx 12 cm × 1,4 = 16,8 cm. Der udføres ingen radiuskorrektion; det forudsætter et bukkeværktøj, der selv kompenserer. Faktoren kan ændres, og ved en ny vinkel foreslås 1/sin(vinkel), afrundet til tre decimaler (45° foreslår altid 1,4).
 
@@ -28,7 +28,7 @@ Appen installeres fra den HTTPS-adresse, GitHub Pages giver dig; en downloadet Z
 Kør `python3 -m http.server 8080` i denne mappe og åbn http://localhost:8080. Offlinebrug kræver, at appen først er indlæst fra HTTPS eller localhost, og service worker er installeret. Ingen automatisk synkronisering: gem projekt som JSON for backup eller overførsel mellem enheder. Projekter gemmes også automatisk i browserens lokale lager.
 
 ## Kontrol
-Kør `node test.mjs`, `node benders.test.mjs`, `node measurements.test.mjs`, `node room-routing.test.mjs`, `node dimension-layout.test.mjs`, `node bend-references.test.mjs` og `node offset-visual.test.mjs`. Testene dækker buegeometri, kompatibilitet med ældre projekter, begge målemetoder, producenttabeller, afsætningsmærker, rumruter, klammer, faktiske radiusbuer, kollisionskontrol, umulige mål og tegningens referencer.
+Kør `node test.mjs`, `node benders.test.mjs`, `node measurements.test.mjs`, `node wall-routing.test.mjs`, `node wall-plan-migration.test.mjs`, `node room-routing.test.mjs`, `node dimension-layout.test.mjs`, `node bend-references.test.mjs` og `node offset-visual.test.mjs`. Testene dækker buegeometri, kompatibilitet med ældre projekter, begge målemetoder, producenttabeller, afsætningsmærker, åbne vægforløb, klammer, faktiske radiusbuer, kollisionskontrol, umulige mål og tegningens referencer.
 
 ## Sprog / Språk / Language
 Vælg Norsk (bokmål), English eller Dansk øverst i appen. Valget gemmes på enheden. Sprogskift ændrer ikke projektets navn, mål eller trekantens retning.
@@ -84,9 +84,11 @@ Fradrag er transskriberet fra Swagelok MS-13-43 Rev G, tabellen på side 23, med
 
 Eksempel med MS-HTB-12M og fem 90°-buk: færdigmål 100, 200, 200, 300, 600, 1000 mm giver mærker 100, 282, 464, 746, 1328 mm fra A og kaplængde 2310 mm efter tabellen. Den ideelle centerlinjelængde er ca. 2318,451 mm. Det er to forskellige beregningsmetoder, og de vises hver for sig.
 
-## Rumplanlægger
-Planlæg rum åbner en plantegning af et rektangulært rum. Angiv bredde/dybde, start/slut på de fire vægge, klammernes placeringer og frie afstand fra væg til rørets yderside. Tilføj vægmonterede forhindringer med position, bredde og fremspring samt den ønskede frie afstand til røret.
+## Vægforløb og rørforslag
+Tegn vægforløb åbner en tegning af den del af væggen, røret skal følge. Tilføj første opmålte længde og fortsæt med længde og vinkel mod venstre eller højre, ligesom når du bygger et rør. Ét vægstykke er nok; forløbet behøver ikke lukke et helt rum. Tegningen viser længder og nummererer vægstykkerne. Vælg, hvilken side af vægforløbet røret skal sidde på.
 
-Forslaget bruger den aktuelle diameter/radius og overholder den valgte maksimale vinkel pr. buk. Det kan følge begge veje langs væggene og går gennem alle angivne klammer. Røret kontrolleres med de faktiske radiusbuer, ikke blot de skarpe skitsehjørner. Forslagene er mulige vægforløb; der loves ikke globalt korteste rute. Tætte eller modstridende placeringer kan give en forklaring om, at intet kontrolleret forslag blev fundet.
+Tryk på et vægstykke for at vælge det, og placér start, slut, klammer og forhindringer med et mål fra stykkets start. Vægafstand er fri afstand fra væg til rørets yderside, og hver klamme kan have sin egen afstand. Forhindringer har position, bredde langs væggen og fremspring ud fra væggen.
 
-Hjørnernes X/Y-koordinater kan redigeres før brug og skal kontrolleres igen. Brug rørforslaget erstatter det aktuelle rør og kan fortrydes. Derefter kan længder/vinkler redigeres i den normale tegning. Rumplanen gemmes med projektet; genåbning kontrollerer den seneste rørføring med de aktuelle dimensioner og klammer. Ældre projekter uden måltype bliver ved med at bruge tangentlængder.
+Forslaget bruger den aktuelle diameter/radius og den valgte maksimale vinkel pr. buk. Det følger det opmålte vægforløb mellem start og slut og skal passe gennem alle klammer på lige stykker. Rørets faktiske radiusbuer kontrolleres mod de tegnede vægge og forhindringer. Der loves ikke globalt korteste rute. Tætte eller modstridende placeringer kan give en forklaring om, at intet kontrolleret forslag blev fundet.
+
+Forslagets hjørnepunkter kan redigeres før brug og skal kontrolleres igen. Brug rørforslaget erstatter det aktuelle rør og kan fortrydes. Derefter kan længder/vinkler redigeres i den normale tegning. Vægforløbet gemmes med projektet; genåbning kontrollerer den seneste rørføring med de aktuelle dimensioner og klammer. Ældre rektangulære rumplaner bevarer deres vægge, klammer, forhindringer og rørføring ved konvertering til vægstykker. Ældre projekter uden måltype bliver ved med at bruge tangentlængder.

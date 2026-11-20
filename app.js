@@ -1,11 +1,11 @@
-import {initAppSharing} from './share-app.mjs?v=21';
+import {initAppSharing} from './share-app.mjs?v=22';
 import {SWAGELOK_BENDERS,getBender} from './benders.mjs';
 import {measurementMode,validateMeasurements,convertMeasurementMode,bendMarkLayout} from './measurements.mjs';
-import {initRoomPlanner} from './room-planner.mjs?v=21';
+import {initRoomPlanner} from './room-planner.mjs?v=22';
 import {renderOffsetVisualization} from './offset-visual.mjs';
 import {initTypography} from './typography.mjs';
 import {placeDimensionLabels} from './dimension-layout.mjs';
-import {bendReferenceLayout,bestDrawingAngle,readableTextAngle} from './labels.mjs?v=21';
+import {bendReferenceLayout,bestDrawingAngle,readableTextAngle} from './labels.mjs?v=22';
 import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs';
 import{geometry,extend,triangle,practicalOffsetLength,calculate}from'./geometry.mjs';
 const $=id=>document.getElementById(id),fmt=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:getBender(state.benderId)?.nativeUnits==='in'?3:1}):'—';
@@ -30,7 +30,7 @@ function render(){
  let preview=null,previewError='';if(has&&ready()){const next=extend(state,end,params().length,params().turn);previewError=validateMeasurements(next)||'';if(!previewError)preview=geometry(next);}
  $('error').textContent=!storageOK?t('Automatisk lagring er utilgængelig. Gem projektet som fil.'):previewError;
  $('add').disabled=state.configured&&(!ready()||!!previewError);
- $('room-plan-status').textContent=state.planner?t(state.planner.routeEdited?'Røret er rettet. Åbn rumplanen for at kontrollere klammer og forhindringer igen.':'Forslag fra rumplan. Længder og vinkler kan redigeres.'):'';
+ $('room-plan-status').textContent=state.planner?t(state.planner.routeEdited?'Røret er rettet. Åbn vægforløbet for at kontrollere klammer og forhindringer igen.':'Forslag langs vægforløbet. Længder og vinkler kan redigeres.'):'';
  $('drawing-mode').textContent=t(measurementMode(state)==='vertex'?'Mål til centerlinjehjørner':'Lige længder mellem tangentpunkter')+(getBender(state.benderId)?' · '+getBender(state.benderId).model:'');
  $('length-label').textContent=t(measurementMode(state)==='vertex'?'Næste færdigmål til hjørne':'Næste lige stykke');
  renderBenderMarks($('live-marks'),state,g);draw(g,preview);updateTools();

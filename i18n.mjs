@@ -735,9 +735,9 @@ const messages={
     "nb": "Kunne ikke åpne deling. Du kan kopiere lenken i stedet.",
     "en": "Could not open sharing. You can copy the link instead."
   },
-  "Planlæg rum": {
-    "nb": "Planlegg rom",
-    "en": "Plan room"
+  "Tegn vægforløb": {
+    "nb": "Tegn veggforløp",
+    "en": "Draw wall path"
   },
   "Bukker": {
     "nb": "Rørbøyer",
@@ -847,13 +847,13 @@ const messages={
     "nb": "Rørforslaget har ugyldige mål.",
     "en": "The proposed pipe has invalid dimensions."
   },
-  "Røret er rettet. Åbn rumplanen for at kontrollere klammer og forhindringer igen.": {
-    "nb": "Røret er endret. Åpne romplanen for å kontrollere klammer og hindringer igjen.",
-    "en": "The pipe has been edited. Reopen the room plan to check clips and obstacles again."
+  "Røret er rettet. Åbn vægforløbet for at kontrollere klammer og forhindringer igen.": {
+    "nb": "Røret er endret. Åpne veggforløpet for å kontrollere klammer og hindringer igjen.",
+    "en": "The pipe has been edited. Reopen the wall path to check clips and obstacles again."
   },
-  "Forslag fra rumplan. Længder og vinkler kan redigeres.": {
-    "nb": "Forslag fra romplan. Lengder og vinkler kan endres.",
-    "en": "Proposal from room plan. Lengths and angles can be edited."
+  "Forslag langs vægforløbet. Længder og vinkler kan redigeres.": {
+    "nb": "Forslag langs veggforløpet. Lengder og vinkler kan endres.",
+    "en": "Proposal along the wall path. Lengths and angles can be edited."
   },
   "Udfoldet rør · afsætningsmærker fra A": {
     "nb": "Rett rør · avsettingsmerker fra A",

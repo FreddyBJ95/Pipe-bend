@@ -264,6 +264,11 @@ function validateModel(c,model) {
     });
     if(!supported)return fail(`Røret passer ikke gennem klamme ${clip.id} på et lige stykke langs væggen.`,'MISSED_CLIP');
   }
+  return validateRouteSelfCollision(model,c.diameter);
+}
+
+/** Shared physical-path check for room and open-wall planners. */
+export function validateRouteSelfCollision(model,diameter) {
   // Reject non-local crossings/close passes. Nearby portions of the same pipe
   // are excluded by their distance along the route, not just array adjacency.
   const segments=[];let station=0;
@@ -273,7 +278,7 @@ function validateModel(c,model) {
     segments.push({a,b,start:station,end:station+length,minX:Math.min(a[0],b[0]),maxX:Math.max(a[0],b[0]),minY:Math.min(a[1],b[1]),maxY:Math.max(a[1],b[1])});
     station+=length;
   }
-  const gap=c.diameter+2*ARC_ERROR;
+  const gap=diameter+2*ARC_ERROR;
   const ordered=segments.map((s,index)=>({...s,index})).sort((a,b)=>a.minX-b.minX);
   let active=[],pairs=0;
   for(const current of ordered) {
@@ -286,12 +291,15 @@ function validateModel(c,model) {
       // excluded local neighbourhood. Only consecutive pieces may share ends.
       if(b.index>a.index+1&&segmentDistance(a.a,a.b,b.a,b.b)<EPS)return fail('Rørføringen krydser sig selv eller kommer for tæt på sig selv.','SELF_COLLISION');
       // Both arcs may lie ARC_ERROR beyond their sampled chords.
-      if(separatedSegmentDistance(a,b,c.diameter*2)<gap-EPS)return fail('Rørføringen krydser sig selv eller kommer for tæt på sig selv.','SELF_COLLISION');
+      if(separatedSegmentDistance(a,b,diameter*2)<gap-EPS)return fail('Rørføringen krydser sig selv eller kommer for tæt på sig selv.','SELF_COLLISION');
     }
     active.push(current);
   }
   return {ok:true};
 }
+
+// The open-wall planner uses the same fillets and approximation bounds.
+export {filletModel as buildRouteGeometry,splitCorners as splitRouteCorners,pointSegmentDistance,segmentDistance};
 
 /** Validate user-edited theoretical vertices without changing their layout. */
 export function validateRoomRoute(input,points) {
