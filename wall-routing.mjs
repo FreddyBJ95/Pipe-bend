@@ -1,6 +1,6 @@
 // Measured, open wall chains. All lengths are mm, turns are signed degrees,
 // heading is radians. The pipe is checked with its real constant-radius arcs.
-import {buildRouteGeometry,splitRouteCorners,validateRouteSelfCollision,pointSegmentDistance,segmentDistance} from './room-routing.mjs?v=24';
+import {buildRouteGeometry,splitRouteCorners,validateRouteSelfCollision,pointSegmentDistance,segmentDistance} from './room-routing.mjs?v=25';
 
 const EPS=1e-7,CLIP_TOLERANCE=0.25;
 const add=(a,b)=>[a[0]+b[0],a[1]+b[1]],sub=(a,b)=>[a[0]-b[0],a[1]-b[1]],mul=(a,k)=>[a[0]*k,a[1]*k];
@@ -163,7 +163,9 @@ function buildSegments(c,padding,ramps=false) {
     const localBounds=c.layout.closed?[-Infinity,Infinity]:[i===0?(c.start.segment===wall.index&&c.end.segment===wall.index?Math.min(c.start.position,c.end.position):(c.start.segment===wall.index?c.start.position:c.end.position)):-Infinity,i===walls.length-1?(c.start.segment===wall.index&&c.end.segment===wall.index?Math.max(c.start.position,c.end.position):(c.start.segment===wall.index?c.start.position:c.end.position)):Infinity];
     for(const obstacle of c.obstacles.filter(o=>o.segment===wall.index&&o.position+o.width>=localBounds[0]-EPS&&o.position<=localBounds[1]+EPS)) {
       if(obstacle.depth+extra<=depth+EPS)continue;
-      const event={a:obstacle.position-extra-padding,b:obstacle.position+obstacle.width+extra+padding,top:obstacle.depth+extra+padding};
+      // Radius room belongs along the wall. Raising the top would silently
+      // change the requested outside-pipe clearance by the padding amount.
+      const event={a:obstacle.position-extra-padding,b:obstacle.position+obstacle.width+extra+padding,top:obstacle.depth+extra};
       if(event.a<a-EPS||event.b>b+EPS)return null;
       groups.push(event);
     }

@@ -49,6 +49,65 @@ for(const maxAngle of [90,60,45,30]) {
     }
   }
 }
+// Real user regression: a 120 mm obstacle, 10 mm wall gap and 10 mm
+// clearance need a 120 mm rise. Radius padding must change the approach
+// location, never raise the pipe from a 10 mm gap to 29 mm (R38 / 2 extra).
+const exactGap={...base,wall:{lengths:[2200],turns:[],heading:0,side:'left'},wallGap:10,clearance:10,maxAngle:45,
+  start:{segment:0,position:200},end:{segment:0,position:2000},clips:[],obstacles:[{id:'120-square',segment:0,position:1000,width:120,depth:120}]};
+function physicalSamples(route) {
+  const points=[];
+  for(const straight of route.straights)for(let i=0;i<=80;i++)points.push(straight.start.map((v,k)=>v+(straight.end[k]-v)*i/80));
+  for(const arc of route.arcs) {
+    const start=Math.atan2(arc.samples[0][1]-arc.center[1],arc.samples[0][0]-arc.center[0]);
+    for(let i=0;i<=720;i++){const angle=start+arc.turn*Math.PI/180*i/720;points.push([arc.center[0]+arc.radius*Math.cos(angle),arc.center[1]+arc.radius*Math.sin(angle)]);}
+  }
+  return points;
+}
+function exactTopClearance(c,route,obstacle) {
+  // Independent measured-wall coordinates and dense physical primitives,
+  // rather than checking the construction vertices or reusing its validator.
+  const wall=wallLayout(c).segments[obstacle.segment];
+  const local=p=>{const x=p[0]-wall.start[0],y=p[1]-wall.start[1];return[x*wall.unit[0]+y*wall.unit[1],x*wall.normal[0]+y*wall.normal[1]];};
+  const points=physicalSamples(route).map(local),half=c.diameter/2;
+  let minimum=Infinity;
+  for(const [along,normal]of points) {
+    const dx=Math.max(obstacle.position-along,0,along-obstacle.position-obstacle.width),dy=Math.max(-normal,0,normal-obstacle.depth);
+    minimum=Math.min(minimum,Math.hypot(dx,dy)-half);
+  }
+  assert.ok(minimum>=c.clearance-1e-6,'Every actual arc and straight must retain the requested clearance');
+  close(minimum,c.clearance);
+  const target=obstacle.depth+c.clearance+half,midpoint=obstacle.position+obstacle.width/2;
+  assert.ok(route.straights.some(line=>{
+    const a=local(line.start),b=local(line.end);
+    return Math.abs(a[1]-target)<1e-6&&Math.abs(b[1]-target)<1e-6&&Math.min(a[0],b[0])<=midpoint&&Math.max(a[0],b[0])>=midpoint;
+  }),'The straight over the obstacle must have the requested outside-pipe gap exactly');
+}
+const approaches=[];
+for(const [diameter,radius]of [[12,38],[12,45],[22,80]]) {
+  const c={...exactGap,diameter,radius},route=checked(c);
+  assert.deepEqual(route.turns,[45,-45,-45,45]);
+  close(route.lengths[1],120*Math.SQRT2);close(route.lengths[3],120*Math.SQRT2);
+  close(route.tangentLengths[1],120*Math.SQRT2-2*radius*Math.tan(Math.PI/8));
+  exactTopClearance(c,route,c.obstacles[0]);approaches.push(route.points[1][0]);
+  for(const [wallGap,clearance]of [[30,10],[10,30],[10,0]]) {
+    const other={...c,wallGap,clearance},r=checked(other),rise=120+clearance-wallGap;
+    close(r.lengths[1],rise*Math.SQRT2);close(r.lengths[3],rise*Math.SQRT2);exactTopClearance(other,r,other.obstacles[0]);
+  }
+}
+assert.ok(approaches[2]<approaches[0],'A larger radius starts its approach earlier, without increasing the obstacle rise');
+for(const c of [
+  {...exactGap,wall:{...exactGap.wall,side:'right'}},
+  {...exactGap,wall:{...exactGap.wall,heading:0.73}},
+  {...exactGap,start:exactGap.end,end:exactGap.start},
+  {...exactGap,clips:[{id:'before',segment:0,position:700},{id:'after',segment:0,position:1500}]},
+])exactTopClearance(c,checked(c),c.obstacles[0]);
+const separate={...exactGap,wall:{...exactGap.wall,lengths:[3200]},end:{segment:0,position:3000},
+  obstacles:[{id:'first',segment:0,position:900,width:120,depth:120},{id:'second',segment:0,position:2100,width:120,depth:180}]};
+const separateRoute=checked(separate);
+for(const obstacle of separate.obstacles)exactTopClearance(separate,separateRoute,obstacle);
+const alreadyClear={...exactGap,wallGap:150},flat=checked(alreadyClear);
+assert.equal(flat.turns.length,0,'An already clear baseline needs no extra lift');
+
 const changedGap={...base,clips:[{id:'dyb-klamme',segment:0,position:1100,gap:180}]};
 const offset=checked(changedGap);
 assert.ok(offset.turns.length>=4);

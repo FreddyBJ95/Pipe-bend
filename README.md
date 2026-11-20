@@ -93,6 +93,8 @@ Korte vægstykker vises med nummerreferencer, når der ikke er plads til hele m�
 
 Tryk på et vægstykke for at vælge det, og placér start, slut, klammer og forhindringer med et mål fra stykkets start. Vægafstand er fri afstand fra væg til rørets yderside, og hver klamme kan have sin egen afstand. Forhindringer har position, bredde langs væggen og fremspring ud fra væggen.
 
+Fri afstand til en forhindring måles fra forhindringen til rørets yderside. Konstruktionen lægger ikke en ekstra del af bukkeradiusen oven i denne højde; radius får plads ved en tidligere tilgang og senere tilbageføring langs væggen. Med et fremspring på 120 mm, vægafstand 10 mm og frirum 10 mm bliver forskydningen 120 mm. Ved 45° er skråstykkets færdigmål mellem centerlinjehjørnerne ca. 169,7 mm. Den faktiske lige tangentstrækning og værktøjets mærkeafstand er særskilte mål. Flere forhindringer, klammer eller andre krav kan stadig kræve en rørføring med større afstand enkelte steder.
+
 Forslaget bruger den aktuelle diameter/radius og den valgte maksimale vinkel pr. buk. Det følger det opmålte vægforløb mellem start og slut og skal passe gennem alle klammer på lige stykker. Rørets faktiske radiusbuer kontrolleres mod de tegnede vægge og forhindringer. Der loves ikke globalt korteste rute. Tætte eller modstridende placeringer kan give en forklaring om, at intet kontrolleret forslag blev fundet.
 
 Nye vægforløb tillader som udgangspunkt 90° pr. buk, så et almindeligt retvinklet væghjørne får ét 90°-buk, når radius og plads tillader det. En grænse på 45° kræver mindst to buk for samme retningsændring. Gemte valg bevares. Tillad 90°-buk og lav nyt forslag ændrer grænsen efter et aktivt tryk og opdaterer forslaget; det eksisterende rør erstattes først ved Brug rørforslaget.

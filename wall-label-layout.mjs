@@ -1,4 +1,4 @@
-import {rectPolygon,polygonsOverlap} from './dimension-layout.mjs?v=24';
+import {rectPolygon,polygonsOverlap} from './dimension-layout.mjs?v=25';
 
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const middle=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];
