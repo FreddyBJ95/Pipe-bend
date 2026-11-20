@@ -1,11 +1,11 @@
-import {initAppSharing} from './share-app.mjs?v=22';
+import {initAppSharing} from './share-app.mjs?v=23';
 import {SWAGELOK_BENDERS,getBender} from './benders.mjs';
 import {measurementMode,validateMeasurements,convertMeasurementMode,bendMarkLayout} from './measurements.mjs';
-import {initRoomPlanner} from './room-planner.mjs?v=22';
+import {initRoomPlanner} from './room-planner.mjs?v=23';
 import {renderOffsetVisualization} from './offset-visual.mjs';
 import {initTypography} from './typography.mjs';
 import {placeDimensionLabels} from './dimension-layout.mjs';
-import {bendReferenceLayout,bestDrawingAngle,readableTextAngle} from './labels.mjs?v=22';
+import {bendReferenceLayout,bestDrawingAngle,readableTextAngle} from './labels.mjs?v=23';
 import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs';
 import{geometry,extend,triangle,practicalOffsetLength,calculate}from'./geometry.mjs';
 const $=id=>document.getElementById(id),fmt=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:getBender(state.benderId)?.nativeUnits==='in'?3:1}):'—';

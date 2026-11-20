@@ -36,7 +36,7 @@ const beam={id:'bjælke',segment:0,position:1050,width:250,depth:250};
 const beamConfig={...base,obstacles:[beam]};
 for(const maxAngle of [90,60,45,30]) {
   const c={...beamConfig,maxAngle},route=checked(c);
-  assert.ok(route.turns.length>=(maxAngle===90?4:8));
+  assert.ok(route.turns.length>=4);
   assert.ok(route.geometricLength>2000);
   // Independent dense interpolation of actual arc primitives checks the
   // outside-pipe distance to the beam, not only the theoretical corners.
@@ -68,6 +68,43 @@ checked({...base,wall:{...base.wall,lengths:[1200,1200],turns:[0]},end:{segment:
 // Unused measured pieces need not be long enough to carry a bend: only the
 // selected start-to-end section is proposed, while all walls remain barriers.
 checked({...base,wall:{...base.wall,lengths:[2400,20],turns:[90]}});
+
+// Real user drawing: two 120 mm wall protrusions along an eleven-piece wall.
+// A proposal must leave the wall earlier, rather than copy every square edge
+// with tightly packed bends or tell the user to edit nonexistent route points.
+const notches={...base,wall:{lengths:[1000,1000,120,120,120,1000,1200,120,120,120,1200],turns:[90,90,-90,-90,90,90,90,-90,-90,90],heading:0,side:'left'},wallGap:10,clearance:10,maxAngle:45,start:{segment:0,position:200},end:{segment:10,position:1000},clips:[],obstacles:[]};
+function sampledWallClearance(c,route) {
+  const walls=wallLayout(c).segments;
+  const pointDistance=(p,a,b)=>{const dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy)));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy);};
+  const points=[];
+  for(const straight of route.straights)for(let i=0;i<=40;i++)points.push(straight.start.map((v,k)=>v+(straight.end[k]-v)*i/40));
+  for(const arc of route.arcs) {
+    const start=Math.atan2(arc.samples[0][1]-arc.center[1],arc.samples[0][0]-arc.center[0]);
+    for(let i=0;i<=240;i++){const a=start+arc.turn*Math.PI/180*i/240;points.push([arc.center[0]+arc.radius*Math.cos(a),arc.center[1]+arc.radius*Math.sin(a)]);}
+  }
+  for(const p of points)for(const wall of walls)assert.ok(pointDistance(p,wall.start,wall.end)>=c.diameter/2-1e-6,'Sampled pipe outside overlaps a measured wall');
+}
+for(const [diameter,radius]of [[12,38],[22,80],[22,120]])for(const maxAngle of [30,45,60,90]) {
+  const c={...notches,diameter,radius,maxAngle},route=checked(c);
+  sampledWallClearance(c,route);
+  assert.equal(route.proposal,'measured-wall-profile');
+  if(maxAngle===45){assert.ok(route.turns.length<=12,'Use ramps instead of twenty short bends');assert.ok(Math.min(...route.tangentLengths)>diameter*2,'Prefer a proposal with usable separation between bends');}
+}
+for(const c of [
+  {...notches,wall:{...notches.wall,turns:notches.wall.turns.map(n=>-n),side:'right'}},
+  {...notches,wall:{...notches.wall,heading:0.73}},
+  {...notches,start:notches.end,end:notches.start},
+])sampledWallClearance(c,checked(c));
+for(const clip of [{id:'near-bump',segment:1,position:900},{id:'lateral-support',segment:2,position:60},{id:'front-support',segment:3,position:60},{id:'second-front',segment:8,position:60}]) {
+  const c={...notches,clips:[clip]},route=checked(c),saved=route.clipPoints.find(a=>a.id===clip.id);
+  assert.equal(saved.segment,clip.segment,'Return the original measured wall segment');
+  saved.point.forEach((n,i)=>close(n,pointOnWall(c,clip)[i]));
+  sampledWallClearance(c,route);
+}
+for(const obstacle of [{id:'original-front',segment:3,position:40,width:40,depth:40},{id:'original-baseline',segment:1,position:400,width:100,depth:60},{id:'original-last',segment:10,position:400,width:100,depth:100}])checked({...notches,obstacles:[obstacle]});
+const noSpace=generateWallRoute({...notches,radius:2000});
+assert.equal(noSpace.ok,false);
+assert.ok(!/Flyt punkterne/.test(noSpace.error),'Do not instruct users to edit a route that was never proposed');
 
 assert.equal(validateWallRoute(beamConfig,straight.points).code,'OBSTACLE_COLLISION');
 const beamRoute=checked(beamConfig),edited=structuredClone(beamRoute.points);

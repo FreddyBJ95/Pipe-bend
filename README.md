@@ -28,7 +28,7 @@ Appen installeres fra den HTTPS-adresse, GitHub Pages giver dig; en downloadet Z
 Kør `python3 -m http.server 8080` i denne mappe og åbn http://localhost:8080. Offlinebrug kræver, at appen først er indlæst fra HTTPS eller localhost, og service worker er installeret. Ingen automatisk synkronisering: gem projekt som JSON for backup eller overførsel mellem enheder. Projekter gemmes også automatisk i browserens lokale lager.
 
 ## Kontrol
-Kør `node test.mjs`, `node benders.test.mjs`, `node measurements.test.mjs`, `node wall-routing.test.mjs`, `node wall-plan-migration.test.mjs`, `node room-routing.test.mjs`, `node dimension-layout.test.mjs`, `node bend-references.test.mjs` og `node offset-visual.test.mjs`. Testene dækker buegeometri, kompatibilitet med ældre projekter, begge målemetoder, producenttabeller, afsætningsmærker, åbne vægforløb, klammer, faktiske radiusbuer, kollisionskontrol, umulige mål og tegningens referencer.
+Kør `node test.mjs`, `node benders.test.mjs`, `node measurements.test.mjs`, `node wall-routing.test.mjs`, `node wall-label-layout.test.mjs`, `node wall-plan-migration.test.mjs`, `node room-routing.test.mjs`, `node dimension-layout.test.mjs`, `node bend-references.test.mjs` og `node offset-visual.test.mjs`. Testene dækker buegeometri, kompatibilitet med ældre projekter, begge målemetoder, producenttabeller, afsætningsmærker, åbne vægforløb, klammer, faktiske radiusbuer, kollisionskontrol, umulige mål og tegningens referencer.
 
 ## Sprog / Språk / Language
 Vælg Norsk (bokmål), English eller Dansk øverst i appen. Valget gemmes på enheden. Sprogskift ændrer ikke projektets navn, mål eller trekantens retning.
@@ -86,6 +86,8 @@ Eksempel med MS-HTB-12M og fem 90°-buk: færdigmål 100, 200, 200, 300, 600, 10
 
 ## Vægforløb og rørforslag
 Tegn vægforløb åbner en tegning af den del af væggen, røret skal følge. Tilføj første opmålte længde og fortsæt med længde og vinkel mod venstre eller højre, ligesom når du bygger et rør. Ét vægstykke er nok; forløbet behøver ikke lukke et helt rum. Tegningen viser længder og nummererer vægstykkerne. Vælg, hvilken side af vægforløbet røret skal sidde på.
+
+Korte vægstykker vises med nummerreferencer, når der ikke er plads til hele målet på tegningen. Alle væglængder findes i den trykbare målliste under tegningen. Referencer flyttes fri af hinanden og væggen; retningspile skaleres eller udelades på de korteste stykker. Et uanvendt vægudkast huskes på enheden, når samme projekt genindlæses.
 
 Tryk på et vægstykke for at vælge det, og placér start, slut, klammer og forhindringer med et mål fra stykkets start. Vægafstand er fri afstand fra væg til rørets yderside, og hver klamme kan have sin egen afstand. Forhindringer har position, bredde langs væggen og fremspring ud fra væggen.
 

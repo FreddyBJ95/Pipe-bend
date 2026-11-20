@@ -1,6 +1,6 @@
 // Measured, open wall chains. All lengths are mm, turns are signed degrees,
 // heading is radians. The pipe is checked with its real constant-radius arcs.
-import {buildRouteGeometry,splitRouteCorners,validateRouteSelfCollision,pointSegmentDistance,segmentDistance} from './room-routing.mjs?v=22';
+import {buildRouteGeometry,splitRouteCorners,validateRouteSelfCollision,pointSegmentDistance,segmentDistance} from './room-routing.mjs?v=23';
 
 const EPS=1e-7,CLIP_TOLERANCE=0.25;
 const add=(a,b)=>[a[0]+b[0],a[1]+b[1]],sub=(a,b)=>[a[0]-b[0],a[1]-b[1]],mul=(a,k)=>[a[0]*k,a[1]*k];
@@ -149,7 +149,7 @@ function cleanSegments(nodes,segment) {
   for(let i=0;i<nodes.length-1;i++)if(distance(nodes[i],nodes[i+1])>EPS)result.push({a:nodes[i],b:nodes[i+1],segment});
   return result;
 }
-function buildSegments(c,padding) {
+function buildSegments(c,padding,ramps=false) {
   const depth=c.wallGap+c.diameter/2,extra=c.diameter/2+c.clearance,segments=[];
   const lowSegment=Math.min(c.start.segment,c.end.segment),highSegment=Math.max(c.start.segment,c.end.segment);
   const walls=c.layout.closed?c.layout.segments:c.layout.segments.slice(lowSegment,highSegment+1);
@@ -167,13 +167,22 @@ function buildSegments(c,padding) {
       if(event.a<a-EPS||event.b>b+EPS)return null;
       groups.push(event);
     }
+    const run=g=>ramps?(g.top-depth)/Math.tan(radians(Math.min(45,c.maxAngle))):0;
     groups.sort((x,y)=>x.a-y.a);const merged=[];
     for(const g of groups) {
-      const previous=merged.at(-1);
-      if(previous&&g.a<=previous.b+EPS){previous.b=Math.max(previous.b,g.b);previous.top=Math.max(previous.top,g.top);}else merged.push({...g});
+      merged.push({...g});
+      while(merged.length>1) {
+        const current=merged.at(-1),previous=merged.at(-2);
+        if(current.a-run(current)>previous.b+run(previous)+EPS)break;
+        merged.splice(-2,2,{a:Math.min(previous.a,current.a),b:Math.max(previous.b,current.b),top:Math.max(previous.top,current.top)});
+      }
     }
     const nodes=[[a,depth]];
-    for(const g of merged)nodes.push([g.a,depth],[g.a,g.top],[g.b,g.top],[g.b,depth]);
+    for(const g of merged) {
+      const ramp=run(g);
+      if(g.a-ramp<a-EPS||g.b+ramp>b+EPS)return null;
+      nodes.push([g.a-ramp,depth],[g.a,g.top],[g.b,g.top],[g.b+ramp,depth]);
+    }
     nodes.push([b,depth]);segments.push(...cleanSegments(nodes.map(([s,d])=>localPoint(wall,s,d)),wall.index));
   }
   return segments;
@@ -219,8 +228,51 @@ function cutPath(segments,start,end,closed,direction) {
   return null;
 }
 
+// A short rectangular wall protrusion is one obstacle to pass, rather than
+// four pipe bends that must copy its sharp corners. This envelope is used for
+// proposal construction only: every result is checked against the original
+// measured walls, obstacles, endpoints and clip directions afterward.
+function wallProfileEnvelope(c) {
+  let pieces=c.layout.segments.map(s=>({...s,mappings:[{segment:s.index,offset:0,depth:0}],features:[]})),changed=false;
+  const constrained=new Set([c.start,c.end,...c.clips,...c.obstacles].map(a=>a.segment));
+  const aligned=(a,b)=>dot(a,b)>1-1e-8&&Math.abs(cross(a,b))<1e-8;
+  for(let i=0;i+4<pieces.length;) {
+    const [a,b,d,e,f]=pieces.slice(i,i+5),connectors=[...b.mappings,...e.mappings];
+    const rectangular=aligned(a.unit,d.unit)&&aligned(a.unit,f.unit)&&aligned(b.unit,mul(e.unit,-1))&&Math.abs(dot(a.unit,b.unit))<1e-8&&Math.abs(b.length-e.length)<=EPS*Math.max(1,b.length,e.length);
+    // A clip on a lateral connector needs a perpendicular straight pipe.
+    // Keep that measured geometry instead of erasing its required support.
+    const supported=connectors.some(m=>constrained.has(m.segment))||b.features.length||e.features.length;
+    const depth=dot(sub(d.start,a.end),a.normal),length=a.length+d.length+f.length;
+    const faceFits=d.mappings.every(m=>!constrained.has(m.segment)||(c.wallGap+m.depth+depth>=0));
+    if(!rectangular||supported||!faceFits) {i++;continue;}
+    const mappings=[...a.mappings,...d.mappings.map(m=>({...m,offset:m.offset+a.length,depth:m.depth+depth})),...f.mappings.map(m=>({...m,offset:m.offset+a.length+d.length}))];
+    const features=[...a.features,...d.features.map(o=>({...o,position:o.position+a.length,depth:o.depth+depth})),...f.features.map(o=>({...o,position:o.position+a.length+d.length}))];
+    if(depth>EPS)features.push({id:`wall-profile-${a.index}-${f.index}`,position:a.length,width:d.length,depth});
+    pieces.splice(i,5,{...a,end:[...f.end],length,mappings,features});changed=true;i=Math.max(0,i-4);
+  }
+  if(!changed)return null;
+  const mappings=new Map();pieces.forEach((piece,index)=>piece.mappings.forEach(m=>mappings.set(m.segment,{...m,index})));
+  function anchor(a) {
+    const m=mappings.get(a.segment);if(!m)return null;
+    const gap=(a.gap??c.wallGap)+m.depth;
+    return gap<0?null:{...a,segment:m.index,position:a.position+m.offset,gap};
+  }
+  const start=anchor(c.start),end=anchor(c.end),clips=c.clips.map(anchor);
+  if(!start||!end||clips.some(a=>!a))return null;
+  const obstacles=c.obstacles.map(o=>{const m=mappings.get(o.segment);return m?{...o,segment:m.index,position:o.position+m.offset,depth:o.depth+m.depth}:null;});
+  if(obstacles.some(o=>!o||o.depth<=0))return null;
+  pieces.forEach((piece,segment)=>piece.features.forEach(o=>{if(o.depth>EPS)obstacles.push({...o,segment});}));
+  if(obstacles.length>40)return null;
+  const turns=pieces.slice(1).map((p,i)=>Math.atan2(cross(pieces[i].unit,p.unit),dot(pieces[i].unit,p.unit))*180/Math.PI);
+  return {wall:{lengths:pieces.map(p=>p.length),turns,heading:c.wall.heading??0,side:c.wall.side??'left'},diameter:c.diameter,radius:c.radius,wallGap:c.wallGap,clearance:c.clearance,maxAngle:c.maxAngle,start,end,clips,obstacles};
+}
+
+const routeScore=(route,radius)=>route.geometricLength+route.turns.length*radius*2;
+
 /** Follow only the wall chain the user measured; never invent room dimensions. */
-export function generateWallRoute(input) {
+export function generateWallRoute(input) {return generateWallRouteInternal(input,true);}
+
+function generateWallRouteInternal(input,allowProfile) {
   const parsed=normalize(input);if(!parsed.ok)return parsed;
   const c=parsed.config,candidates=[],errors=[];
   const station=a=>c.layout.segments[a.segment].startStation+a.position;
@@ -228,9 +280,10 @@ export function generateWallRoute(input) {
   if(!c.layout.closed&&c.clips.some(a=>station(a)<Math.min(station(c.start),station(c.end))-EPS||station(a)>Math.max(station(c.start),station(c.end))+EPS))return fail('En klamme ligger uden for strækningen mellem rørets start og slut. Flyt klammen eller endepunkterne.','CLIP_ORDER');
   // Split corners need a larger construction circle than the real tool
   // radius, otherwise the new neighbouring bends leave zero straight tube.
-  const factors=[1.25,1.6,2.2];
+  const factors=[1.25,1.6,2.2,1.05,1.01];
   for(const padFactor of [0.5,1,1.5,2.5,4]) {
-    const base=buildSegments(c,c.radius*padFactor);
+    for(const ramps of [true,false]) {
+    const base=buildSegments(c,c.radius*padFactor,ramps);
     if(!base){errors.push(fail('Der er for lidt plads ved et væghjørne eller en forhindring. Flyt forhindringen eller øg vægafstanden.','CORNER_SPACE'));continue;}
     const segments=insertClipWindows(c,base);
     if(!segments){errors.push(fail('Der er ikke plads til klammernes vægafstande mellem hjørner og forhindringer.','CLIP_SPACE'));continue;}
@@ -241,15 +294,35 @@ export function generateWallRoute(input) {
         const points=splitRouteCorners(nominal,c.radius,c.maxAngle,factor);
         if(!points){errors.push(fail('Der er ikke plads til den valgte maksimale bukkevinkel.','MAX_ANGLE_SPACE'));continue;}
         const result=validateWallRoute(c,points);
-        if(result.ok)candidates.push({...result,direction:direction===1?'forward':'reverse',proposal:'measured-wall',score:result.geometricLength+result.turns.length*c.radius*0.01});
+        if(result.ok)candidates.push({...result,direction:direction===1?'forward':'reverse',proposal:'measured-wall',score:routeScore(result,c.radius)});
         else if(result.code==='TOO_COMPLEX')return result;else errors.push(result);
       }
     }
+    }
     if(candidates.length)break;
+  }
+  if(allowProfile) {
+    const envelope=wallProfileEnvelope(c);
+    if(envelope) {
+      const proposal=generateWallRouteInternal(envelope,false);
+      if(proposal.ok) {
+        const checked=validateWallRoute(c,proposal.points);
+        if(checked.ok)candidates.push({...checked,direction:proposal.direction,proposal:'measured-wall-profile',score:routeScore(checked,c.radius)});
+        else errors.push(checked);
+      }else errors.push(proposal);
+    }
   }
   if(!candidates.length) {
     const specific=errors.find(e=>['MISSED_CLIP','OBSTACLE_COLLISION','INSUFFICIENT_STRAIGHT','WALL_COLLISION'].includes(e.code))??errors[0];
-    return fail(specific?`Intet kontrolleret rørforslag fundet. ${specific.error}`:'Der er ikke plads til et rørforslag langs væggen.','NO_ROUTE');
+    const suggestions={
+      WALL_COLLISION:'Der er for lidt plads ved et væghjørne med den valgte radius og vægafstand. Prøv større vægafstand, mindre radius eller en anden placering af start, slut og klammer.',
+      INSUFFICIENT_STRAIGHT:'Der er ikke plads til bukkeradius mellem hjørner, klammer eller forhindringer. Prøv mindre radius, større tilladt bukkevinkel eller mere afstand mellem placeringerne.',
+      MAX_ANGLE:'Der kunne ikke findes en rørføring med den valgte maksimale bukkevinkel. Prøv større tilladt vinkel, mindre radius eller mere plads ved hjørnerne.',
+      REVERSAL:'De korte vægstykker og den valgte radius gav ikke et brugbart forslag. Prøv mindre radius eller mere plads ved hjørnerne.',
+      SELF_COLLISION:'Forslagene kom for tæt på andre dele af samme rør. Prøv mindre radius eller en anden placering af klammer og ender.',
+    };
+    const details=suggestions[specific?.code]??specific?.error;
+    return {...fail(details?`Intet kontrolleret rørforslag fundet. ${details}`:'Der er ikke plads til et rørforslag langs væggen.','NO_ROUTE'),reasonCode:specific?.code};
   }
   candidates.sort((a,b)=>a.score-b.score||a.turns.length-b.turns.length);
   const {score,...result}=candidates[0];return result;
