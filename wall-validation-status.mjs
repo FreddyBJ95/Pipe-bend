@@ -1,10 +1,10 @@
-import {hasSpatialPipe} from './spatial-geometry.mjs';
+import {hasSpatialPipe} from './spatial-geometry.mjs?v=38';
 // A worksheet/export must describe the current pipe, not merely the planner's
 // last saved point list. The explicit edited flag requires a new planner Apply.
 import {geometry} from './geometry.mjs';
 import {measurementMode,convertMeasurementMode} from './measurements.mjs';
-import {migrateRoomPlanner} from './room-planner.mjs?v=37';
-import {validateWallRoute} from './wall-routing.mjs?v=37';
+import {migrateRoomPlanner} from './room-planner.mjs?v=38';
+import {validateWallRoute} from './wall-routing.mjs?v=38';
 
 const finitePoint=point=>Array.isArray(point)&&point.length===2&&point.every(Number.isFinite);
 const messages={

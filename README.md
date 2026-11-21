@@ -10,7 +10,7 @@ Dansk PWA til planlægning af rørbuk. Ingen konto eller eksterne biblioteker.
 
 Den ideelle centerlinjegeometri beregnes med tangentlængder plus cirkelbuer. Afsætningsmærker og kaplængde efter producentens værktøjstabel er en separat, praktisk mærkemetode. Begge værdier vises med tydelige betegnelser; geometriske tangentpunkter kaldes ikke bukkemærker. Materialeoversigten bruger værktøjstabellens kaplængde, når hele opsætningen understøttes, ellers den geometriske længde.
 
-Rørmodellen arbejder i ét plan (2D). Vægplanlæggeren kontrollerer rørets yderside mod de tegnede vægge, forhindringer, andre dele af samme rør samt klammer på de lige stykker. Der modelleres ikke højdeskift, rotation mellem bukkeplaner, materialedeformation, fjederretur eller savsnit. Brug producentens mærkereference og kontrollér den valgte opsætning mod et prøvebuk.
+Rørredigeringen understøtter både plane rør og højdeskift mellem bukkeplaner. Vægplanlæggerens kontrol arbejder i 2D og kontrollerer rørets yderside mod de tegnede vægge, forhindringer, andre dele af samme rør samt klammer på de lige stykker. Højdeskift indgår ikke i vægkontrollen. Materialedeformation, fjederretur og savsnit modelleres ikke. Brug producentens mærkereference og kontrollér den valgte opsætning mod et prøvebuk.
 
 Pythagoras finder en ukendt side i en retvinklet trekant. Tryk Vis trekant for at se en tegning med sidelængder og grøn markering af den beregnede side. Tegningen følger indtastningerne. Drej 90° og Spejlvend tilpasser orienteringen uden at ændre sider eller beregning. Nulstil retning gendanner standardvisningen. Forskydningsværktøjet bruger den praktiske mærkeafstand: ønsket forskydning × faktor. Ved 45° er standardfaktoren 1,4 (afrundet), fx 12 cm × 1,4 = 16,8 cm. Der udføres ingen radiuskorrektion; det forudsætter et bukkeværktøj, der selv kompenserer. Faktoren kan ændres, og ved en ny vinkel foreslås 1/sin(vinkel), afrundet til tre decimaler (45° foreslår altid 1,4).
 
@@ -123,3 +123,10 @@ Visningen kan skiftes mellem den oprindelige rørtegning, ovenfra, forfra, fra s
 Arbejdsvisning og SVG/PDF viser projektioner og højder samt en ekstra kolonne for drejning før hvert buk. Drejning er set A→B, positiv med uret; første reference vises ved A som 0°, øvrige drejninger følger det foregående buk. Værktøjstabellernes afsætningsmål og kaplængder bruger fortsat den dokumenterede metode.
 
 Projektformatversion 1 bevares med valgfrie `bendRotations` og `startFrame`; gamle projekter og måledata fungerer fortsat. Begge ender, redigering, Fortryd og JSON-overførsel bevarer rumlig geometri. Vægplanlæggeren er fortsat 2D: den kan ikke godkende højdeskift eller erstatte et rumligt rør med et 2D-forslag. Dens vægudkast kan stadig redigeres separat.
+
+
+### Visninger og arbejdstegning (v38)
+
+Visningsskift viser nu den valgte SVG ved at styre dens HTML-attribut direkte; SVG-elementers `hidden`-egenskab fungerer ikke som på HTML-elementer. Den skjulte tegnings kamera påvirker ikke zoomknapperne.
+
+Arbejdsvisningen viser igen én stor tegning. Vælg overblik, ovenfra, forfra, fra siden eller 3D i værktøjslinjen; SVG og udskrift bruger samme valgte side. Plane projekter beholder deres oprindelige overblikstegning. Andre sider udelader mål på stykker, der ses fra enden, skjulte stykker og buk, der kun fremstår som en streg. Ovenfra bevares symboler og højdeskift for lodrette rør. De fulde afsætningsmål og bukkedata nedenunder bevares uafhængigt af visningen.

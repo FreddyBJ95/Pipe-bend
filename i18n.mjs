@@ -994,7 +994,9 @@ const messages={
   "Geometriske tangentpunkter fra ende A": {
     "nb": "Geometriske tangentpunkter fra ende A",
     "en": "Geometric tangent points from end A"
-  }
+  },
+  "Overblik":{"nb":"Oversikt","en":"Overview"},
+  "Visning i arbejdsvisningen":{"nb":"Visning i arbeidsvisningen","en":"Worksheet view"}
 };
 export const locales={da:'da-DK',nb:'nb-NO',en:'en-GB'};
 export let language='da';

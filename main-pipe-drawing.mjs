@@ -1,8 +1,8 @@
-import {createWallViewport} from './wall-viewport.mjs?v=37';
-import {mainPipeToSvgPath,pipeDetailStrokeWidths} from './main-pipe-detail.mjs?v=37';
-import {layoutMainDetailAnnotations} from './main-detail-annotations.mjs?v=37';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=37';
-import {referenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=37';
+import {createWallViewport} from './wall-viewport.mjs?v=38';
+import {mainPipeToSvgPath,pipeDetailStrokeWidths} from './main-pipe-detail.mjs?v=38';
+import {layoutMainDetailAnnotations} from './main-detail-annotations.mjs?v=38';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=38';
+import {referenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=38';
 
 const NS='http://www.w3.org/2000/svg';
 const rect=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
@@ -25,7 +25,7 @@ function visibleLine(a,b,width,height,padding=24){
  * independently. A pan/zoom never rebuilds the tube or changes project data. */
 export function createMainPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=String,translate=s=>s,onEdit=()=>{},onEndpoint=()=>{}}){
  let frame=null;
- const viewport=createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange:update,enabled:()=>!svg.hidden});
+ const viewport=createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange:update,enabled:()=>!svg.hasAttribute('hidden')});
  function node(tag,attrs,parent,text){const item=document.createElementNS(NS,tag);for(const [key,value]of Object.entries(attrs||{}))item.setAttribute(key,String(value));if(text!==undefined)item.textContent=text;(parent||svg).append(item);return item;}
  function editable(item,type,index){item.setAttribute('role','button');item.setAttribute('tabindex','0');item.onclick=()=>onEdit(type,index);item.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onEdit(type,index);}};}
  function update(state){

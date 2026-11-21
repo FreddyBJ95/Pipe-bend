@@ -1,5 +1,5 @@
-import {createWallViewport} from './wall-viewport.mjs?v=37';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=37';
+import {createWallViewport} from './wall-viewport.mjs?v=38';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=38';
 
 const NS='http://www.w3.org/2000/svg',EPS=1e-8;
 const finite=n=>typeof n==='number'&&Number.isFinite(n);
@@ -86,6 +86,56 @@ export function spatialLineVisibility(lines,diameter){
 
 function segmentHit(point,a,b){const dx=b[0]-a[0],dy=b[1]-a[1],den=dx*dx+dy*dy,t=den>EPS?clamp(((point[0]-a[0])*dx+(point[1]-a[1])*dy)/den):.5;return{distance:distance(point,[a[0]+dx*t,a[1]+dy*t]),fraction:t,depth:a[2]+(b[2]-a[2])*t};}
 
+/** Labels describe only geometry that can be read in this projection. An
+ * orthographic length is shown only in its true plane; an end-on vertical run
+ * in the top view is the explicit height-transition exception. Hidden parts
+ * remain selectable, but never produce a label through a nearer tube. */
+export function classifySpatialProjection(geometry,{view='top',orientation,diameter=12,pixelsPerMm=1,projected}={}){
+ const p=projected||projectSpatialGeometry(geometry,view,pixelsPerMm,orientation),visibility=spatialLineVisibility(p.lines,diameter),radius=Math.max(0,diameter/2);
+ const occluders=[];
+ const add=(a,b,key)=>occluders.push({a,b,key,minX:Math.min(a[0],b[0])-radius,maxX:Math.max(a[0],b[0])+radius,minY:Math.min(a[1],b[1])-radius,maxY:Math.max(a[1],b[1])+radius});
+ p.lines.forEach((line,index)=>add(line.start,line.end,'L'+index));
+ // Bounds before segment-distance checks keep the ordinary long-pipe case
+ // cheap. The sampled curves use the same precision as the visible path.
+ geometry.arcs.forEach((arc,index)=>{const curve=spatialArcSamples(arc,.22/Math.max(EPS,diameter/24)).map(point=>projectSpatialPoint(point,view,orientation));for(let i=1;i<curve.length;i++)add(curve[i-1],curve[i],'B'+index);});
+ // Occlusion precision is tied to tube width, not zoom. A bounded spatial grid
+ // avoids scanning every adaptive bend segment for each visible annotation.
+ let minX=0,maxX=0,minY=0,maxY=0;for(const part of occluders){minX=Math.min(minX,part.minX);maxX=Math.max(maxX,part.maxX);minY=Math.min(minY,part.minY);maxY=Math.max(maxY,part.maxY);}
+ const cellSize=Math.max(EPS,diameter,(maxX-minX)/32,(maxY-minY)/32),grid=new Map(),cellKey=(x,y)=>x+','+y;
+ for(const part of occluders)for(let x=Math.floor(part.minX/cellSize);x<=Math.floor(part.maxX/cellSize);x++)for(let y=Math.floor(part.minY/cellSize);y<=Math.floor(part.maxY/cellSize);y++){const key=cellKey(x,y);if(!grid.has(key))grid.set(key,[]);grid.get(key).push(part);}
+ function exposed(point,key){
+  const excluded=Array.isArray(key)?key:[key];
+  for(const part of grid.get(cellKey(Math.floor(point[0]/cellSize),Math.floor(point[1]/cellSize)))||[]){
+   if(excluded.includes(part.key)||point[0]<part.minX||point[0]>part.maxX||point[1]<part.minY||point[1]>part.maxY)continue;
+   const hit=segmentHit(point,part.a,part.b);
+   if(hit.distance<=radius+EPS&&hit.depth>point[2]+Math.max(EPS,diameter*1e-7))return false;
+  }
+  return true;
+ }
+ const lines=p.lines.map((line,index)=>{
+  const original=geometry.lines[index],length=Math.hypot(...original.end.map((v,i)=>v-original.start[i])),projectedLength=distance(line.start,line.end),collapsed=projectedLength<=Math.max(EPS,length*1e-8),trueLength=Math.abs(line.end[2]-line.start[2])<=Math.max(EPS,length*1e-7);
+  const rise=view==='top'&&collapsed&&Math.abs(original.end[2]-original.start[2])>EPS;
+  const intervals=visibility[index].visible.slice().sort((a,b)=>(b[1]-b[0])-(a[1]-a[0]));
+  let anchorInterval=null;
+  if(rise){const upper=line.start[2]>=line.end[2]?line.start:line.end;if(exposed(upper,['L'+index,'B'+(index-1),'B'+index]))anchorInterval=[0,1];}
+  else for(const interval of intervals){if([.2,.5,.8].some(fraction=>exposed(mix(line.start,line.end,interval[0]+fraction*(interval[1]-interval[0])),'L'+index))){anchorInterval=interval;break;}}
+  const readable=rise||(!collapsed&&(view==='iso'||trueLength));
+  return{index,kind:rise?'rise':'length',collapsed,trueLength,projectedLength,visible:!!anchorInterval,readable,annotate:readable&&!!anchorInterval,anchorInterval};
+ });
+ const arcs=p.arcs.map((arc,index)=>{
+  const original=geometry.arcs[index],normal=original.binormal||[original.tangent[1]*original.normal[2]-original.tangent[2]*original.normal[1],original.tangent[2]*original.normal[0]-original.tangent[0]*original.normal[2],original.tangent[0]*original.normal[1]-original.tangent[1]*original.normal[0]];
+  const facing=Math.abs(projectSpatialPoint(normal,view,orientation)[2])/Math.hypot(...normal);
+  // Below this ellipse ratio the bend is practically edge-on: its badge would
+  // suggest a readable corner where the drawing only shows a straight line.
+  const readable=facing>=.15;
+  const candidates=[.5,.4,.6,.3,.7,.2,.8,.1,.9].map(fraction=>arc.samples[Math.round(fraction*(arc.samples.length-1))]);
+  const visible=readable&&candidates.some(point=>exposed(point,'B'+index));
+  const anchor=readable?candidates.find(point=>exposed(point,'B'+index))||arc.samples[Math.floor(arc.samples.length/2)]:null;
+  return{index,facing,readable,visible,annotate:readable&&visible,anchor};
+ });
+ return{view,lines,arcs,isExposed:exposed};
+}
+
 /** Screen point picking stays independent of SVG paint order and orientation. */
 export function pickSpatialParts(projected,point,{pixelsPerMm=1,tolerance=22,diameter=0}={}){
  if(!projected||!Array.isArray(point)||!point.slice(0,2).every(finite)||!finite(pixelsPerMm)||pixelsPerMm<=0)return[];
@@ -145,7 +195,7 @@ function paintTube(frame,group,pixelsPerUnit=1,preview=null){
  }
  for(const [i,arc]of projected.arcs.entries())parts.push({type:'angle',index:i,points:arc.samples,depth:arc.samples.reduce((sum,p)=>sum+p[2],0)/arc.samples.length});
  parts.sort((a,b)=>a.depth-b.depth);
- const width=diameter*scale,inner=Math.max(0,width-2/Math.max(EPS,pixelsPerUnit));
+ const width=Math.max(diameter*scale,settings.overviewStroke||0),inner=Math.max(0,width-(settings.overviewStroke?4:2/Math.max(EPS,pixelsPerUnit)));
  if(preview){const projection=projectSpatialGeometry(preview,settings.view||'top',scale*pixelsPerUnit,settings.orbit);let delta=[0,0,0];
   if(settings.end==='A'&&preview.lines[1]){const anchor=preview.lines[1].dimensionStart||preview.lines[1].start,old=geometry.lines[0].dimensionStart||geometry.lines[0].start;delta=projectSpatialPoint(old.map((value,i)=>value-anchor[i]),settings.view||'top',settings.orbit);}
   const previewPoint=p=>P(p.map((value,i)=>value+delta[i]));
@@ -169,7 +219,7 @@ function paintAnnotations(frame,group,camera,{format=String,translate=s=>s,onEdi
  const toScreen=p=>[(p[0]-camera.x)*density+width/2,(p[1]-camera.y)*density+height/2],project=p=>toScreen(P(p));
  const topLeft=[camera.x-width/2/density,camera.y-height/2/density];group.setAttribute('transform',`translate(${topLeft[0]} ${topLeft[1]}) scale(${1/density})`);
  const guides=node(svg,'g',{'data-layer':'spatial-guides','pointer-events':'none'},group),labels=node(svg,'g',{'data-layer':'spatial-labels'},group),ends=node(svg,'g',{'data-layer':'spatial-ends'},group);
- const obstacles=[],pipeWidth=Math.max(1,(settings.diameter||12)*scale*density/2),items=[],heightZero=g.start[2];
+ const labelScale=settings.annotationScale||1,obstacles=[],pipeWidth=Math.max(1,(settings.diameter||12)*scale*density/2,(settings.overviewStroke||0)*density/2),items=[],heightZero=g.start[2],classification=classifySpatialProjection(g,{view:settings.view||'top',orientation:settings.orbit,diameter:settings.diameter||12,pixelsPerMm:scale*density,projected});
  for(const line of projected.lines){const a=project(line.start),b=project(line.end);if(clippedLine(a,b,width,height,-pipeWidth))obstacles.push(footprint(a,b,pipeWidth+2));}
  for(const arc of projected.arcs){const stride=Math.max(1,Math.floor(arc.samples.length/60));for(let i=1;i<arc.samples.length;i+=stride){const a=project(arc.samples[i-1]),b=project(arc.samples[Math.min(i+stride-1,arc.samples.length-1)]);if(clippedLine(a,b,width,height,-pipeWidth))obstacles.push(footprint(a,b,pipeWidth+2));}}
  const endpointPositions=projected.start&&projected.end?[project(projected.start),project(projected.end)]:[];
@@ -187,31 +237,41 @@ function paintAnnotations(frame,group,camera,{format=String,translate=s=>s,onEdi
  }
  function editable(item,type,index){if(!interactive)return;item.setAttribute('role','button');item.setAttribute('tabindex','0');item.onclick=event=>{event.stopPropagation?.();onEdit(type,index);};item.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onEdit(type,index);}};}
  for(const [index,line]of projected.lines.entries()){
-  const a=project(line.start),b=project(line.end),visible=clippedLine(a,b,width,height);if(!visible)continue;
+  const eligibility=classification.lines[index];if(!eligibility.annotate)continue;
+  const interval=eligibility.anchorInterval||[0,1],a=project(mix(line.start,line.end,interval[0])),b=project(mix(line.start,line.end,interval[1]));let visible=clippedLine(a,b,width,height);if(!visible)continue;
+  // Anchor a partially visible length on an exposed portion in this camera,
+  // including when an arc rather than a straight is the nearer occluder.
+  if(!eligibility.collapsed){
+   const fullA=project(line.start),fullB=project(line.end),probes=[.5,.2,.8].map(fraction=>mix(visible[0],visible[1],fraction)),anchor=probes.find(point=>{const fraction=segmentHit(point,[...fullA,line.start[2]],[...fullB,line.end[2]]).fraction;return classification.isExposed(mix(line.start,line.end,fraction),'L'+index);});
+   if(!anchor)continue;
+   const span=distance(...visible),u=span>EPS?[(visible[1][0]-visible[0][0])/span,(visible[1][1]-visible[0][1])/span]:[1,0],half=Math.min(distance(anchor,visible[0]),distance(anchor,visible[1]));visible=[[anchor[0]-u[0]*half,anchor[1]-u[1]*half],[anchor[0]+u[0]*half,anchor[1]+u[1]*half]];
+  }
   const original=g.lines[index],riseData=spatialRiseLabelData(g,index),zStart=riseData.start,zEnd=riseData.end;
-  const collapsed=distance(a,b)<3,delta=riseData.rise,base=(selectedPart(settings.selected,'length',index)?'L'+(index+1)+' · ':'')+format(original.dimension??original.length)+' mm';
+  const collapsed=eligibility.collapsed,delta=riseData.rise,base=(selectedPart(settings.selected,'length',index)?'L'+(index+1)+' · ':'')+format(original.dimension??original.length)+' mm';
   let heightText=Math.abs(delta)<1e-6?'H '+signedHeight(zStart,format)+' mm':'H '+signedHeight(zStart,format)+' → '+signedHeight(zEnd,format)+' mm';
+  if(settings.compactOverview&&Math.abs(delta)<1e-6&&Math.abs(zStart)<1e-6)heightText=null;
   let text=base,dimensionText=null;
   if(collapsed&&settings.view==='top'&&Math.abs(delta)>1e-6){text=(delta>0?'⊙ ':'⊗ ')+translate(delta>0?'Op':'Ned')+' '+format(Math.abs(delta))+' mm';if(riseData.showSeparateDimension)dimensionText='L'+(index+1)+' · '+format(riseData.dimension)+' mm';}
-  const maxLength=Math.max(text.length,heightText.length,dimensionText?.length||0),labelWidth=Math.min(width-24,Math.max(70,maxLength*6.8+16));
-  items.push({id:'L'+(index+1),type:'length',index,a:visible[0],b:visible[1],text,heightText,dimensionText,width:labelWidth,height:dimensionText?56:40,angle:0,collapsed,priority:selectedPart(settings.selected,'length',index)?0:collapsed?1:2});
+  const maxLength=Math.max(text.length,heightText?.length||0,dimensionText?.length||0),labelWidth=Math.min(width-24,Math.max(70*labelScale,maxLength*6.8*labelScale+16*labelScale));
+  items.push({id:'L'+(index+1),type:'length',index,a:visible[0],b:visible[1],text,heightText,dimensionText,width:labelWidth,height:(dimensionText?56:heightText?40:26)*labelScale,angle:0,collapsed,priority:selectedPart(settings.selected,'length',index)?0:collapsed?1:2});
   if(collapsed&&settings.view==='top'&&Math.abs(delta)>1e-6){const point=project(line.start),symbol=node(svg,'g',{'data-height-transition':'L'+(index+1)},labels);node(svg,'circle',{cx:point[0],cy:point[1],r:9,fill:'#fff',stroke:'#226d54','stroke-width':1.5},symbol);if(delta>0)node(svg,'circle',{cx:point[0],cy:point[1],r:3,fill:'#226d54'},symbol);else{node(svg,'path',{d:`M ${point[0]-3} ${point[1]-3} l 6 6 M ${point[0]-3} ${point[1]+3} l 6 -6`,stroke:'#226d54','stroke-width':1.5},symbol);}editable(symbol,'length',index);}
  }
  for(const [index,arc]of projected.arcs.entries()){
-  const p=project(arc.samples[Math.floor(arc.samples.length/2)]);if(!inView(p,width,height,0))continue;
-  const text='B'+(index+1);items.push({id:text,type:'angle',index,a:p,b:p,text,width:Math.max(36,text.length*8+16),height:26,angle:0,priority:selectedPart(settings.selected,'angle',index)?0:3});
+  const eligibility=classification.arcs[index];if(!eligibility.annotate)continue;
+  const p=project(eligibility.anchor);if(!inView(p,width,height,0))continue;
+  const text='B'+(index+1);items.push({id:text,type:'angle',index,a:p,b:p,text,width:Math.max(36,text.length*8+16)*labelScale,height:26*labelScale,angle:0,priority:selectedPart(settings.selected,'angle',index)?0:3});
  }
  items.sort((a,b)=>a.priority-b.priority||distance(b.a,b.b)-distance(a.a,a.b));
- const placed=placeDimensionLabels(items,obstacles,{x:8,y:8,w:width-16,h:height-16},{allowOmissions:true,localFallback:items.length<45,acceptCandidate:c=>c.box.x>=8&&c.box.y>=8&&c.box.x+c.box.w<=width-8&&c.box.y+c.box.h<=height-8&&Math.hypot(c.x-(c.a[0]+c.b[0])/2,c.y-(c.a[1]+c.b[1])/2)<=110});
+ const placed=placeDimensionLabels(items,obstacles,{x:8,y:8,w:width-16,h:height-16},{allowOmissions:true,localFallback:items.length<45,acceptCandidate:c=>c.box.x>=8&&c.box.y>=8&&c.box.x+c.box.w<=width-8&&c.box.y+c.box.h<=height-8&&Math.hypot(c.x-(c.a[0]+c.b[0])/2,c.y-(c.a[1]+c.b[1])/2)<=110*labelScale});
  for(const label of placed){
   const isBend=label.type==='angle',anchor=[(label.a[0]+label.b[0])/2,(label.a[1]+label.b[1])/2],selected=selectedPart(settings.selected,label.type,label.index),dx=anchor[0]-label.x,dy=anchor[1]-label.y,factor=Math.min(1,label.width/2/Math.max(EPS,Math.abs(dx)),label.height/2/Math.max(EPS,Math.abs(dy)));
   node(svg,'line',{x1:anchor[0],y1:anchor[1],x2:label.x+dx*factor,y2:label.y+dy*factor,stroke:isBend?'#b9783c':'#8ba699','stroke-width':1},guides);
   const attrs={'data-focus-key':label.id,'data-reference':label.id,'data-spatial-label':label.id,'aria-label':label.id+' · '+label.text+(label.heightText?' · '+label.heightText:'')};
   if(label.type==='length')attrs['data-length']=label.id;else attrs['data-bend-id']=label.id;
   const item=node(svg,'g',attrs,labels);node(svg,'title',{},item,attrs['aria-label']);node(svg,'rect',{x:label.x-label.width/2,y:label.y-label.height/2,width:label.width,height:label.height,rx:isBend?13:5,fill:selected?'#fff0d9':isBend?'#fff4e8':'#fff',stroke:selected?'#b16a14':isBend?'#b9783c':'#b7c9be','stroke-width':selected?1.7:.8},item);
-  node(svg,'text',{x:label.x,y:label.y+(label.dimensionText?-11:label.heightText?-3:4.5),'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':isBend?13:12,'font-weight':600,fill:isBend?'#994c0c':'#176748'},item,label.text);
-  if(label.dimensionText)node(svg,'text',{'data-spatial-input-dimension':label.id,x:label.x,y:label.y+4,'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':11,fill:'#176748'},item,label.dimensionText);
-  if(label.heightText)node(svg,'text',{'data-height-label':label.id,'aria-label':translate('Højde fra A')+' · '+label.heightText,x:label.x,y:label.y+(label.dimensionText?19:12),'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':10.5,fill:'#55776a'},item,label.heightText);
+  node(svg,'text',{x:label.x,y:label.y+(label.dimensionText?-11:label.heightText?-3:4.5)*labelScale,'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':(isBend?13:12)*labelScale,'font-weight':600,fill:isBend?'#994c0c':'#176748'},item,label.text);
+  if(label.dimensionText)node(svg,'text',{'data-spatial-input-dimension':label.id,x:label.x,y:label.y+4*labelScale,'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':11*labelScale,fill:'#176748'},item,label.dimensionText);
+  if(label.heightText)node(svg,'text',{'data-height-label':label.id,'aria-label':translate('Højde fra A')+' · '+label.heightText,x:label.x,y:label.y+(label.dimensionText?19:12)*labelScale,'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':10.5*labelScale,fill:'#55776a'},item,label.heightText);
   editable(item,label.type,label.index);
  }
  for(const [index,letter]of ['A','B'].entries()){
@@ -240,14 +300,14 @@ function paintAnnotations(frame,group,camera,{format=String,translate=s=>s,onEdi
   node(svg,'rect',{x:label[0]-12,y:label[1]-9,width:24,height:17,rx:3,fill:'#fff',opacity:.95},reference);
   node(svg,'text',{x:label[0],y:label[1]+3.5,'text-anchor':'middle','font-size':10.5,'font-weight':600,fill:color},reference,'0°');
  }
- svg.setAttribute('data-spatial-placed-labels',String(placed.length));svg.setAttribute('data-spatial-total-labels',String(items.length));
+ svg.setAttribute('data-spatial-placed-labels',String(placed.length));svg.setAttribute('data-spatial-total-labels',String(items.length));svg.setAttribute('data-spatial-eligible-lengths',classification.lines.filter(part=>part.annotate).map(part=>'L'+(part.index+1)).join(' '));svg.setAttribute('data-spatial-eligible-bends',classification.arcs.filter(part=>part.annotate).map(part=>'B'+(part.index+1)).join(' '));
 }
 
 /** Separate SVG from the planar editor: hidden views do not share a camera. */
 export function createSpatialPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=String,translate=s=>s,onEdit=()=>{},onEndpoint=()=>{},onPick}={}){
  let frame=null,lastView=null,orbitMode=false;
  const orbit={yaw:Math.PI/4,pitch:Math.atan(1/Math.SQRT2)};
- const viewport=createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange:update,onTap:tap,onSingleDrag:orbitDrag,enabled:()=>!svg.hidden});
+ const viewport=createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange:update,onTap:tap,onSingleDrag:orbitDrag,enabled:()=>!svg.hasAttribute('hidden')});
  function orbitDrag({deltaX,deltaY}){
   if(!orbitMode||!frame||frame.settings.view!=='iso')return false;
   const points=frame.geometry.points,pivot=[0,1,2].map(index=>(Math.min(...points.map(p=>p[index]))+Math.max(...points.map(p=>p[index])))/2);
@@ -292,16 +352,14 @@ export function createSpatialPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=S
  return{draw,reset:()=>viewport.reset(),getState:()=>viewport.getState(),setOrbitMode:value=>{orbitMode=!!value;svg.setAttribute('data-orbit-mode',String(orbitMode));svg.style.cursor=orbitMode?'grab':'';return orbitMode;},getOrbitMode:()=>orbitMode,getOrbitAngles:()=>({...orbit})};
 }
 
-/** Printable three-view sheet. It uses the same orthographic projection and
- * physical path as the editor, with no interactive camera or hidden controls. */
-export function renderSpatialWorkDrawing(svg,geometry,{diameter=12,radius=38,format=String,translate=s=>s,view='top',width=900,height=1200}={}){
- svg.replaceChildren();svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.setAttribute('data-spatial-work','true');
- const panels=[{view:'top',title:translate('Ovenfra')},{view:'front',title:translate('Forfra')},{view:'side',title:translate('Fra siden')}];
- panels.forEach((panel,index)=>{
-  const panelHeight=height/3,group=node(svg,'g',{transform:`translate(0 ${index*panelHeight})`});
-  node(svg,'text',{x:24,y:30,'font-size':18,'font-weight':600,fill:'#183c36'},group,panel.title);
-  const frame=layoutFrame(svg,geometry,{diameter,radius,view:panel.view,end:'B'},width,panelHeight-36);frame.P=((original)=>p=>{const q=original(p);return[q[0],q[1]+36,q[2]];})(frame.P);
-  const pipe=node(svg,'g',{'data-work-view':panel.view},group),annotations=node(svg,'g',{},group);paintTube(frame,pipe,1);paintAnnotations(frame,annotations,{x:width/2,y:panelHeight/2,width,height:panelHeight,pixelsPerUnit:1},{format,translate,interactive:false});
-  if(index<2)node(svg,'line',{x1:20,y1:panelHeight-1,x2:width-20,y2:panelHeight-1,stroke:'#d9e4de'},group);
- });
+/** A single large workshop view preserves the old drawing's visual hierarchy.
+ * Other projections are chosen explicitly, rather than compressed beside it.
+ * Geometry stays exact; the overview line weight is deliberately legible. */
+export function renderSpatialWorkDrawing(svg,geometry,{diameter=12,radius=38,format=String,translate=s=>s,view='iso',width=900,height=1200}={}){
+ svg.replaceChildren();svg.removeAttribute('data-inline-bends');svg.removeAttribute('data-total-bends');svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.setAttribute('data-spatial-work','true');svg.setAttribute('data-spatial-work-view',view);
+ const title=translate(view==='top'?'Ovenfra':view==='front'?'Forfra':view==='side'?'Fra siden':'3D-overblik');
+ node(svg,'text',{'data-work-view-title':'',x:30,y:38,'font-family':'var(--app-font, sans-serif)','font-size':22,'font-weight':600,fill:'#183c36'},svg,title);
+ const frame=layoutFrame(svg,geometry,{diameter,radius,view,end:'B',annotationScale:1.5,overviewStroke:10,compactOverview:true},width,height-56);
+ frame.P=((original)=>p=>{const q=original(p);return[q[0],q[1]+56,q[2]];})(frame.P);
+ const pipe=node(svg,'g',{'data-work-view':view}),annotations=node(svg,'g',{'data-work-view-annotations':view});paintTube(frame,pipe,1);paintAnnotations(frame,annotations,{x:width/2,y:height/2,width,height,pixelsPerUnit:1},{format,translate,interactive:false});
 }

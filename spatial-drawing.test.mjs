@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import {geometry3D} from './spatial-geometry.mjs';
-import {projectSpatialPoint,projectSpatialGeometry,spatialArcSamples,spatialLineVisibility,pickSpatialParts,spatialRiseLabelData} from './spatial-drawing.mjs';
+import {geometry3D} from './spatial-geometry.mjs?v=38';
+import {projectSpatialPoint,projectSpatialGeometry,spatialArcSamples,spatialLineVisibility,pickSpatialParts,spatialRiseLabelData,classifySpatialProjection} from './spatial-drawing.mjs?v=38';
 
 const close=(a,b,epsilon=1e-7)=>assert(Math.abs(a-b)<=epsilon,`${a} != ${b}`);
 assert.deepEqual(projectSpatialPoint([12,34,56],'top'),[12,34,56]);
@@ -70,3 +70,34 @@ assert.equal(verticalHit[0].type,'length');assert.equal(verticalHit[0].index,0);
 const dotHit=pickSpatialParts({lines:[{start:[0,0,0],end:[0,0,500]}],arcs:[]},[0,0]);
 assert.equal(dotHit[0].type,'length','Vertical top-view transition remains selectable');
 console.log('Spatial orthographic projection, repeated elevations, adaptive bend precision, partial hidden spans and overlapping/vertical picking: PASS');
+
+// Real projected features govern annotation eligibility, not just the presence
+// of a physical part in the3D model. Hidden metadata stays in the full tables.
+const planar=geometry3D({radius:38,heading:0,measurementMode:'vertex',lengths:[1000,500],turns:[90]});
+const topXY=classifySpatialProjection(planar,{view:'top'}),frontXY=classifySpatialProjection(planar,{view:'front'}),sideXY=classifySpatialProjection(planar,{view:'side'});
+assert(topXY.lines.every(line=>line.annotate));assert(topXY.arcs[0].annotate,'XY corner is visible from above');
+assert.deepEqual(frontXY.lines.filter(line=>line.annotate).map(line=>line.index),[0]);assert(!frontXY.arcs[0].annotate,'XY corner is edge-on from front');
+assert.deepEqual(sideXY.lines.filter(line=>line.annotate).map(line=>line.index),[1]);assert(!sideXY.arcs[0].annotate,'XY corner is edge-on from side');
+const topXZ=classifySpatialProjection(g,{view:'top'}),frontXZ=classifySpatialProjection(g,{view:'front'}),sideXZ=classifySpatialProjection(g,{view:'side'});
+assert.deepEqual(topXZ.lines.filter(line=>line.kind==='rise'&&line.annotate).map(line=>line.index),[1,3],'Both true up/down transitions remain explicit in plan');
+assert(topXZ.arcs.every(arc=>!arc.annotate),'Height bends have no misleading plan corner badges');
+assert(frontXZ.arcs.every(arc=>arc.annotate),'Height bends are readable in front elevation');
+assert.deepEqual(sideXZ.lines.filter(line=>line.annotate).map(line=>line.index),[1,3],'Side elevation omits the three end-on horizontal runs');
+assert(sideXZ.arcs.every(arc=>!arc.annotate),'Side elevation omits edge-on corners');
+const slope=geometry3D({radius:29.4,heading:0,measurementMode:'vertex',lengths:[913.5,407.25],turns:[45],bendRotations:[90]});
+assert(!classifySpatialProjection(slope,{view:'top'}).lines[1].annotate,'Foreshortened sloping length is not presented as a plan dimension');
+assert(classifySpatialProjection(slope,{view:'front'}).lines[1].annotate,'Same true-length inclined run can be dimensioned in its own plane');
+const stacked=geometry3D({radius:38,heading:0,measurementMode:'vertex',lengths:[1000,500,1000],turns:[90,90],bendRotations:[90,0]});
+const stackTop=classifySpatialProjection(stacked,{view:'top'});
+assert(!stackTop.lines[0].annotate,'A fully hidden lower run has no label through its upper run');assert(stackTop.lines[2].annotate,'The upper run remains dimensioned');
+for(const heading of [.13,.61,1.4])for(const roll of [-71,-23,29,68]){
+ const angled=geometry3D({radius:31.2,heading,measurementMode:'vertex',lengths:[932,481,743],turns:[63,-47],bendRotations:[roll,0]});
+ for(const view of ['top','front','side']){
+  const classification=classifySpatialProjection(angled,{view});
+  for(const part of classification.lines)if(part.annotate&&part.kind!=='rise'){
+   const line=angled.lines[part.index],a=projectSpatialPoint(line.start,view),b=projectSpatialPoint(line.end,view);
+   close(Math.hypot(b[0]-a[0],b[1]-a[1]),line.length,1e-6);
+  }
+ }
+}
+console.log('Projection-aware annotations: readable XY/XZ corners, hidden and end-on parts, true lengths, arbitrary headings/rolls and explicit height transitions PASS');
