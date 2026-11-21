@@ -93,6 +93,18 @@ export function placeDimensionLabels(items, obstacles = [], bounds = { x: 0, y: 
       consider(mx + nx * offset + ux * along, my + ny * offset + uy * along, offset, along);
     }
 
+    // An optional second pass for omitted labels fills gaps between the coarse
+    // offsets. Its caller supplies already placed labels as fixed obstacles,
+    // so better local coverage never moves an otherwise good dimension.
+    if (!best && options.localFallback) {
+      const fineShifts = [0, 12, -12, 36, -36, 60, -60, 96, -96, 144, -144];
+      for (let distance = 16; distance <= 144; distance += 8) {
+        for (const offset of [distance, -distance]) for (const along of fineShifts) {
+          consider(mx + nx * offset + ux * along, my + ny * offset + uy * along, offset, along);
+        }
+      }
+    }
+
     // Broaden the search when no in-bounds placement is available. Each candidate
     // is still rejected on any collision; we never choose a colliding fallback.
     if ((!best || best.score >= 1e7) && !options.allowOmissions) {

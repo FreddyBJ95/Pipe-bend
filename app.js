@@ -1,13 +1,13 @@
-import {initAppSharing} from './share-app.mjs?v=29';
+import {initAppSharing} from './share-app.mjs?v=30';
 import {SWAGELOK_BENDERS,getBender} from './benders.mjs';
 import {measurementMode,validateMeasurements,convertMeasurementMode,bendMarkLayout} from './measurements.mjs';
-import {initRoomPlanner} from './room-planner.mjs?v=29';
+import {initRoomPlanner} from './room-planner.mjs?v=30';
 import {renderOffsetVisualization} from './offset-visual.mjs';
-import {initTypography} from './typography.mjs?v=29';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=29';
-import {layoutBlankMarks} from './blank-layout.mjs?v=29';
-import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=29';
-import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=29';
+import {initTypography} from './typography.mjs?v=30';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=30';
+import {layoutBlankMarks} from './blank-layout.mjs?v=30';
+import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=30';
+import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=30';
 import{geometry,extend,triangle,practicalOffsetLength,calculate}from'./geometry.mjs';
 const $=id=>document.getElementById(id),fmt=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:getBender(state.benderId)?.nativeUnits==='in'?3:1}):'—';
 function newDrawingNumber(){const d=new Date(),date=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('');return 'PB-'+date+'-'+crypto.randomUUID().slice(0,6).toUpperCase();}
@@ -64,12 +64,20 @@ function draw(g,preview,target=$('drawing'),work=false){
  const crosses=(a,b,c,d)=>{const u=[b[0]-a[0],b[1]-a[1]],v=[d[0]-c[0],d[1]-c[1]],w=[c[0]-a[0],c[1]-a[1]],det=u[0]*v[1]-u[1]*v[0];if(Math.abs(det)<1e-8)return false;const t=(w[0]*v[1]-w[1]*v[0])/det,q=(w[0]*u[1]-w[1]*u[0])/det;return t>1e-5&&t<1-1e-5&&q>1e-5&&q<1-1e-5;};
  const hits=(a,b,polygon)=>{const inside=p=>{const signs=polygon.map((v,i)=>{const q=polygon[(i+1)%polygon.length];return(q[0]-v[0])*(p[1]-v[1])-(q[1]-v[1])*(p[0]-v[0]);});return signs.every(n=>n>=0)||signs.every(n=>n<=0);};return inside(a)||inside(b)||polygon.some((p,i)=>crosses(a,b,p,polygon[(i+1)%polygon.length]));};
  const dimensionLeader=dim=>{const start=[(dim.a[0]+dim.b[0])/2,(dim.a[1]+dim.b[1])/2],dx=start[0]-dim.x,dy=start[1]-dim.y,angle=dim.angle*Math.PI/180,localX=dx*Math.cos(angle)+dy*Math.sin(angle),localY=-dx*Math.sin(angle)+dy*Math.cos(angle),factor=Math.min(1,dim.width/2/Math.max(1e-8,Math.abs(localX)),dim.height/2/Math.max(1e-8,Math.abs(localY)));return[start,[dim.x+dx*factor,dim.y+dy*factor]];};
- const placed=placeDimensionLabels(items,obstacles,{x:12,y:12,w:width-24,h:pageHeight-24},{allowOmissions:true,acceptCandidate:(dim,accepted)=>{
+ const dimensionFits=(maxLeader,maxDistance,prior=[])=>(dim,accepted)=>{
   if(dim.box.x<10||dim.box.y<10||dim.box.x+dim.box.w>width-10||dim.box.y+dim.box.h>pageHeight-10)return false;
   const [start,finish]=dimensionLeader(dim),length=Math.hypot(start[0]-finish[0],start[1]-finish[1]);
-  if(length>(work?64:42)||Math.hypot(start[0]-dim.x,start[1]-dim.y)>(work?100:66)||leaderCrossesPipe(start,finish,pipe))return false;
-  return !layout.labels.some(p=>hits(start,finish,p.polygon))&&!accepted.some(p=>hits(start,finish,p.polygon)||crosses(start,finish,...dimensionLeader(p)))&&!layout.labels.some(p=>crosses(start,finish,...p.leader));
- },extraObstacles:dim=>[footprint(...dimensionLeader(dim),2)]}).map(dim=>({...dim,leader:dimensionLeader(dim)}));
+  if(length>maxLeader||Math.hypot(start[0]-dim.x,start[1]-dim.y)>maxDistance||leaderCrossesPipe(start,finish,pipe))return false;
+  return !layout.labels.some(p=>hits(start,finish,p.polygon))&&![...prior,...accepted].some(p=>hits(start,finish,p.polygon)||crosses(start,finish,...dimensionLeader(p)))&&!layout.labels.some(p=>crosses(start,finish,...p.leader));
+ };
+ const dimensionBounds={x:12,y:12,w:width-24,h:pageHeight-24},dimensionFootprint=dim=>[footprint(...dimensionLeader(dim),2)];
+ const primary=placeDimensionLabels(items,obstacles,dimensionBounds,{allowOmissions:true,acceptCandidate:dimensionFits(work?64:42,work?100:66),extraObstacles:dimensionFootprint}).map(dim=>({...dim,leader:dimensionLeader(dim)}));
+ // Keep good local labels fixed, then give only the missing dimensions more
+ // room. Every second-pass candidate still obeys bounds, pipe, label and
+ // leader collision checks; the text is never dropped just for a short leg.
+ const missing=items.filter(item=>!primary.some(dim=>dim.id===item.id));
+ const secondary=placeDimensionLabels(missing,[...obstacles,...primary.map(dim=>dim.polygon),...primary.flatMap(dimensionFootprint)],dimensionBounds,{allowOmissions:true,localFallback:items.length<=60,acceptCandidate:dimensionFits(work?104:64,work?154:100,primary),extraObstacles:dimensionFootprint}).map(dim=>({...dim,leader:dimensionLeader(dim)}));
+ const placed=[...primary,...secondary].sort((a,b)=>a.index-b.index);
  for(const dim of placed){
   const [a,b]=dim.leader;
   el('line',{'data-length-leader':dim.id,x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:'#8ca697','stroke-width':1},leaders);

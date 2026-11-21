@@ -1,17 +1,25 @@
 // Independent camera for the wall workspace. Geometry and hit targets remain
 // in the drawing's base coordinates; only the SVG viewBox changes.
-export function createWallViewport({svg,zoomIn,zoomOut,fit,output}) {
+export function createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange}) {
   const camera={zoom:1,x:450,y:270,width:900,height:540};
   const pointers=new Map();
   let gesture=null,dragging=false,suppressClick=false,suppressUntil=0;
-  const clamp=value=>Math.min(8,Math.max(1,value));
+  let changeHandler=typeof onChange==='function'?onChange:null,notifying=false;
+  const clamp=value=>Math.min(256,Math.max(1,value));
   const finite=value=>typeof value==='number'&&Number.isFinite(value);
-  function apply(){
+  function notify(){
+    if(!changeHandler||notifying)return;
+    const width=camera.width/camera.zoom,height=camera.height/camera.zoom;
+    const state={...camera,pixelsPerUnit:screen().scale,viewBox:{x:camera.x-width/2,y:camera.y-height/2,width,height}};
+    notifying=true;try{changeHandler(state);}finally{notifying=false;}
+  }
+  function apply(notifyChange=true){
     const width=camera.width/camera.zoom,height=camera.height/camera.zoom;
     svg.setAttribute('viewBox',`${camera.x-width/2} ${camera.y-height/2} ${width} ${height}`);
     if(output)output.textContent=Math.round(camera.zoom*100)+'%';
-    if(zoomIn)zoomIn.disabled=camera.zoom>=8;
+    if(zoomIn)zoomIn.disabled=camera.zoom>=256;
     if(zoomOut)zoomOut.disabled=camera.zoom<=1;
+    if(notifyChange)notify();
   }
   // Account for the SVG's default xMidYMid meet letterboxing as well as CSS
   // sizes, so wheel and pinch anchors stay under the user's fingers.
@@ -104,6 +112,9 @@ export function createWallViewport({svg,zoomIn,zoomOut,fit,output}) {
     if(finite(width)&&width>0&&finite(height)&&height>0){camera.x*=width/camera.width;camera.y*=height/camera.height;camera.width=width;camera.height=height;}
     apply();
   }
-  apply();
-  return{update,reset,getState:()=>({...camera}),clientPoint:point};
+  function setOnChange(handler){changeHandler=typeof handler==='function'?handler:null;notify();}
+  // Renderers may reference the returned camera in their callback. Avoid a
+  // constructor callback before that reference can be assigned.
+  apply(false);
+  return{update,reset,getState:()=>({...camera}),clientPoint:point,setOnChange};
 }

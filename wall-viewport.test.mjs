@@ -33,19 +33,29 @@ const host=new Element(),svg=new Element(),zoomIn=new Element(),zoomOut=new Elem
 svg.ownerDocument={defaultView:host};
 const viewport=createWallViewport({svg,zoomIn,zoomOut,fit,output});
 const near=(actual,expected,message)=>assert(Math.abs(actual-expected)<1e-10,message);
+const changes=[];
+viewport.setOnChange(state=>{changes.push({...state});state.zoom=-1;});
+assert.equal(changes.length,1,'A renderer can attach after camera construction');
+assert.equal(viewport.getState().zoom,1,'Notifications expose a copy of camera state');
 viewport.update(800,400);
 assert.deepEqual(viewport.getState(),{zoom:1,x:400,y:200,width:800,height:400});
 assert.equal(output.textContent,'100%');assert(zoomOut.disabled);
+assert.equal(changes.at(-1).pixelsPerUnit,1);
+assert.deepEqual(changes.at(-1).viewBox,{x:0,y:0,width:800,height:400});
 
 // Wheel zoom must preserve the world point under the cursor.
 const anchor=viewport.clientPoint(610,120);
+let changeCount=changes.length;
 svg.emit('wheel',{clientX:610,clientY:120,deltaY:-200});
+assert(changes.length>changeCount,'Wheel zoom notifies the incremental renderer');
 const after=viewport.clientPoint(610,120);
 near(after.x,anchor.x);near(after.y,anchor.y);
 assert(viewport.getState().zoom>1);
 let old=viewport.getState();
+changeCount=changes.length;
 viewport.update(800,400);
 assert.deepEqual(viewport.getState(),old,'Numeric redraw must preserve the camera');
+assert(changes.length>changeCount,'Geometry updates notify without resetting the camera');
 
 // Taps on selectable pipe pieces must not be retargeted by pointer capture.
 svg.emit('pointerdown',{pointerId:1,clientX:210,clientY:120,target:{role:'button'}});
@@ -56,8 +66,10 @@ svg.emit('pointerup',{pointerId:1});
 assert(!svg.emit('click').prevented,'An ordinary target tap remains selectable');
 
 svg.emit('pointerdown',{pointerId:1,clientX:210,clientY:120,target:{role:'button'}});
+changeCount=changes.length;
 svg.emit('pointermove',{pointerId:1,clientX:250,clientY:130});
 assert(svg.captured.has(1));assert(viewport.getState().x<old.x);
+assert(changes.length>changeCount,'Pan notifies without losing the active pointer');
 svg.emit('pointerup',{pointerId:1});
 assert(svg.emit('click').prevented,'Dragging must not select a pipe piece');
 svg.emit('pointerdown',{pointerId:1,clientX:210,clientY:120});
@@ -94,7 +106,16 @@ svg.emit('pointerup',{pointerId:1});svg.emit('pointerup',{pointerId:2});
 assert(svg.emit('click').prevented);
 
 for(let i=0;i<30;i++)zoomIn.emit('click');
-assert.equal(viewport.getState().zoom,8);assert(zoomIn.disabled);
+assert.equal(viewport.getState().zoom,256);assert(zoomIn.disabled);
+assert.equal(output.textContent,'25600%');
+assert.equal(changes.at(-1).pixelsPerUnit,256,'Annotation scale includes actual CSS pixel density');
+// Even near the new detail-zoom limit, the wheel anchor is stable.
+zoomOut.emit('click');
+const detailAnchor=viewport.clientPoint(695,85);
+svg.emit('wheel',{clientX:695,clientY:85,deltaY:-200});
+const detailAfter=viewport.clientPoint(695,85);
+assert.equal(viewport.getState().zoom,256);
+near(detailAfter.x,detailAnchor.x);near(detailAfter.y,detailAnchor.y);
 svg.emit('keydown',{key:'0'});assert.equal(viewport.getState().zoom,1);
 old=viewport.getState();svg.emit('keydown',{key:'ArrowRight'});
 assert.equal(viewport.getState().x,old.x+45);
@@ -110,6 +131,17 @@ svg.emit('wheel',{clientX:510,clientY:120,deltaY:-200});
 const letterboxAfter=viewport.clientPoint(510,120);
 near(letterboxAfter.x,letterboxAnchor.x);near(letterboxAfter.y,letterboxAnchor.y);
 assert(svg.attrs.viewBox.split(' ').every(n=>Number.isFinite(Number(n))));
+changeCount=changes.length;
 fit.emit('click');assert.equal(output.textContent,'100%');assert(zoomOut.disabled);
+assert(changes.length>changeCount,'Fit notifies annotation layout');
+assert.equal(changes.at(-1).pixelsPerUnit,.5,'Annotation scale includes SVG letterboxing');
+assert.deepEqual(changes.at(-1).viewBox,{x:0,y:0,width:400,height:800});
+viewport.setOnChange(null);changeCount=changes.length;
+zoomIn.emit('click');assert.equal(changes.length,changeCount,'The callback can be removed');
 
-console.log('Wall viewport zoom, pan, pinch, pointer cleanup, redraw, keyboard and fit tests passed.');
+const deferred=[];
+const other=createWallViewport({svg:new Element(),onChange:state=>deferred.push(state.zoom)});
+assert.equal(deferred.length,0,'A constructor callback waits until construction completes');
+other.update(500,300);assert.deepEqual(deferred,[1]);
+
+console.log('Wall viewport detail zoom, callbacks, pan, pinch, pointer cleanup, redraw, keyboard and fit tests passed.');

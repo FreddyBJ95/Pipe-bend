@@ -43,3 +43,28 @@ const boundedItems=[{id:'omit',a:[100,100],b:[200,100],width:70,height:24},{id:'
 const bounded=placeDimensionLabels(boundedItems,[],{x:0,y:0,w:300,h:300},{allowOmissions:true,acceptCandidate:p=>p.id==='keep'&&Math.abs(p.x-150)<1e-8&&Math.abs(p.y-128)<1e-8});
 assert.equal(bounded.length,1);assert.equal(bounded[0].id,'keep');assert.equal(bounded[0].x,150);assert.equal(bounded[0].y,128);
 console.log('Local candidate rejection does not reserve phantom dimension space: PASS');
+
+// A real free label slot can fall between the coarse normal offsets. The
+// fallback must find that slot rather than assume the whole area is crowded.
+const slotItem={id:'L11',index:10,a:[100,100],b:[200,100],text:'270 mm',width:40,height:18};
+const slotWalls=[rectPolygon(61,150,122,300),rectPolygon(239,150,122,300),rectPolygon(150,74.5,300,149),rectPolygon(150,239.5,300,121)];
+const slotBounds={x:0,y:0,w:300,h:300};
+const inSlotView=p=>p.box.x>=0&&p.box.y>=0&&p.box.x+p.box.w<=300&&p.box.y+p.box.h<=300;
+assert.equal(placeDimensionLabels([slotItem],slotWalls,slotBounds,{allowOmissions:true,acceptCandidate:inSlotView}).length,0);
+const slotted=placeDimensionLabels([slotItem],slotWalls,slotBounds,{allowOmissions:true,localFallback:true,acceptCandidate:inSlotView});
+assert.equal(slotted.length,1,'270 mm must use available local whitespace');
+assert.equal(slotted[0].x,150);assert.equal(slotted[0].y,164);
+for(const obstacle of slotWalls)assert.equal(polygonsOverlap(slotted[0].polygon,obstacle),false);
+
+// Retrying an omitted short-leg dimension must keep already-good labels fixed.
+const good={id:'L1',index:0,a:[450,400],b:[750,400],text:'1.000 mm',width:90,height:28};
+const short={id:'L11',index:10,a:[150,100],b:[150,180],text:'270 mm',width:76,height:28};
+const obstacles=[rectPolygon(60,140,160,250),rectPolygon(180,100,50,28),rectPolygon(180,180,50,28),rectPolygon(150,140,16,80)];
+const view={x:0,y:0,w:900,h:1200},within=limit=>p=>Math.hypot(p.x-(p.a[0]+p.b[0])/2,p.y-(p.a[1]+p.b[1])/2)<=limit;
+const primary=placeDimensionLabels([good,short],obstacles,view,{allowOmissions:true,acceptCandidate:within(78)});
+assert.deepEqual(primary.map(p=>p.id),['L1']);const primaryBefore=structuredClone(primary);
+const recovered=placeDimensionLabels([short],[...obstacles,...primary.map(p=>p.polygon)],view,{allowOmissions:true,localFallback:true,acceptCandidate:within(118)});
+assert.equal(recovered.length,1,'The short vertical 270 mm callout has room beyond the first leader limit');
+for(const fixed of [...obstacles,...primary.map(p=>p.polygon)])assert.equal(polygonsOverlap(recovered[0].polygon,fixed),false);
+assert.deepEqual(primary,primaryBefore,'Retrying a missing label must not move an existing one');
+console.log('Missing270 dimension: fine whitespace search and fixed first-pass labels PASS');
