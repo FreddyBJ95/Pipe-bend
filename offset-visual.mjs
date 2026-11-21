@@ -6,7 +6,7 @@
 export function renderOffsetVisualization(svg, values, t = text => text, fmt = n => String(n)) {
   const {offset, angle, length, factor, unit = 'mm', rotation = 0, mirror = false} = values;
   svg.replaceChildren();
-  svg.setAttribute('viewBox', '0 0 480 330');
+  svg.setAttribute('viewBox', '0 0 480 280');
   svg.setAttribute('role', 'img');
   const doc = svg.ownerDocument || document;
   function element(tag, attributes, text, parent = svg) {
@@ -113,8 +113,6 @@ export function renderOffsetVisualization(svg, values, t = text => text, fmt = n
     label(labelPoint,fmt(angle)+'°',{fill:'#426b58'});
   }
   text(240, 270, 'M = H × '+fmt(factor), {'font-size':13,'font-weight':600,fill:'#617d70'});
-  text(240, 294, t('M er afstanden mellem bukkemærkerne.'), {'font-size':12,fill:'#617d70'});
-  text(240, 316, t('Principskitse · ikke målfast.'), {'font-size':12,fill:'#617d70'});
   svg.setAttribute('aria-label', t('Forskydning {offset} {unit}, to buk på {angle}°, faktor {factor} og mærkeafstand M {length} {unit}.',
     {offset:fmt(offset),unit,angle:fmt(angle),factor:fmt(factor),length:fmt(length)}));
   return true;

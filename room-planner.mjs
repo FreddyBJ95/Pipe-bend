@@ -1,13 +1,14 @@
-import {generateWallRoute,validateWallRoute,wallLayout,pointOnWall,wallObstaclePolygon} from './wall-routing.mjs?v=34';
-import {layoutLocalWallLabels,wallSegmentFootprint,wallDirectionArrow} from './wall-label-layout.mjs?v=34';
-import {rectPolygon} from './dimension-layout.mjs?v=34';
-import {pipeModelFromPoints} from './wall-pipe-edit.mjs?v=34';
-import {solveWallPipeEdit} from './wall-pipe-solver.mjs?v=34';
-import {buildRouteGeometry} from './room-routing.mjs?v=34';
-import {createWallViewport} from './wall-viewport.mjs?v=34';
-import {geometryToSvgPath,getWallClearanceDimensions} from './wall-detail-geometry.mjs?v=34';
-import {pickPipePart,pickWallSegment} from './wall-picking.mjs?v=34';
-import {projectIdentity,projectOpenKey,readWallDraft,writeWallDraft,clearWallDraft} from './project-storage.mjs?v=34';
+import {generateWallRoute,validateWallRoute,wallLayout,pointOnWall,wallObstaclePolygon} from './wall-routing.mjs?v=35';
+import {layoutLocalWallLabels,wallSegmentFootprint,wallDirectionArrow} from './wall-label-layout.mjs?v=35';
+import {rectPolygon} from './dimension-layout.mjs?v=35';
+import {pipeModelFromPoints} from './wall-pipe-edit.mjs?v=35';
+import {solveWallPipeEdit} from './wall-pipe-solver.mjs?v=35';
+import {buildRouteGeometry} from './room-routing.mjs?v=35';
+import {createWallViewport} from './wall-viewport.mjs?v=35';
+import {geometryToSvgPath,getWallClearanceDimensions} from './wall-detail-geometry.mjs?v=35';
+import {pickPipePart,pickWallSegment} from './wall-picking.mjs?v=35';
+import {setIconButton} from './ui-icons.mjs?v=35';
+import {projectIdentity,projectOpenKey,readWallDraft,writeWallDraft,clearWallDraft} from './project-storage.mjs?v=35';
 
 const words={
   title:['Tegn vægforløb','Tegn veggforløp','Draw the wall path'],
@@ -15,6 +16,7 @@ const words={
   close:['Tilbage til røret','Tilbake til røret','Back to the pipe'],wallStage:['1 · Tegn væggen','1 · Tegn veggen','1 · Draw the wall'],
   zoomIn:['Zoom ind','Zoom inn','Zoom in'],zoomOut:['Zoom ud','Zoom ut','Zoom out'],zoomFit:['Tilpas visning','Tilpass visning','Fit drawing'],panHint:['Træk for at flytte · Brug + / − eller to fingre til zoom','Dra for å flytte · Bruk + / − eller to fingre for zoom','Drag to pan · Use + / − or two fingers to zoom'],pipePart:['Vælg rørstykke eller buk','Velg rørstykke eller bøy','Choose pipe section or bend'],wallOverview:['Vægmål og oversigt','Veggmål og oversikt','Wall dimensions and overview'],
   settingsTabs:['Vægindstillinger','Vegginnstillinger','Wall settings'],tabWalls:['Vægge','Vegger','Walls'],tabPlacement:['Placering','Plassering','Placement'],tabClips:['Klammer','Klammer','Clips'],tabObstacles:['Forhindringer','Hindringer','Obstacles'],
+  angleInfo:['Om bukkevinkler','Om bøyevinkler','About bend angles'],
   measuredGap:['Fri afstand','Fri avstand','Clear gap'],zoomWallGroup:['Zoom ind på vægstykkerne','Zoom inn på veggstykkene','Zoom into these wall segments'],
   wallHint:['Byg væggen med længder og vinkler, ligesom du tegner røret. Væggen behøver ikke slutte, hvor den starter.','Bygg veggen med lengder og vinkler, som når du tegner røret. Veggen trenger ikke ende der den starter.','Build the wall with lengths and turns, just like drawing the pipe. The wall does not need to form a closed room.'],
   wall:['Væg','Vegg','Wall'],wallLength:['Væglængde · mm','Vegglengde · mm','Wall length · mm'],nextLength:['Næste vægstykke · mm','Neste veggstykke · mm','Next wall segment · mm'],
@@ -194,6 +196,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
   const el=(tag,attrs={},text)=>{const node=document.createElement(tag);for(const [name,value]of Object.entries(attrs)){if(name==='class')node.className=value;else node.setAttribute(name,String(value));}if(text!==undefined)node.textContent=text;return node;};
   const translated=(tag,key,attrs={})=>el(tag,{'data-rp-text':key,...attrs},tr(key));
   const button=(key,action,attrs={})=>{const node=translated('button',key,{type:'button',...attrs});node.addEventListener('click',action);return node;};
+  const iconButton=(key,name,action,attrs={})=>{const node=button(key,action,attrs);node.removeAttribute('data-rp-text');node.dataset.rpIconLabel=key;node.dataset.rpIconName=name;return setIconButton(node,name,tr(key));};
   const q=id=>dialog.querySelector('#'+id);
   const fieldValue=field=>field.value===field.dataset.shownValue?Number(field.dataset.originalValue):Number(field.value);
   const value=id=>fieldValue(q(id));
@@ -222,34 +225,33 @@ export function initRoomPlanner({getProject,onApply,language}) {
   function segmentSelect(index,id) {const select=el('select',{'data-wall-choice':'',...(id?{id}:{})});fillSegmentSelect(select,index);return select;}
   function fillSegmentSelect(select,index) {select.replaceChildren();if(index<0||index>=wall.lengths.length)select.append(el('option',{value:-1},tr('selectWall')));wall.lengths.forEach((_,i)=>select.append(el('option',{value:i},wallName(i))));select.value=String(index>=0&&index<wall.lengths.length?index:-1);}
   function updateSegmentChoices(map=index=>index) {for(const select of dialog.querySelectorAll('[data-wall-choice]'))fillSegmentSelect(select,map(Number(select.value)));activeWall=Number(q('rp-active-wall').value);q('rp-add-clip').disabled=activeWall<0;q('rp-add-obstacle').disabled=activeWall<0;}
-  const heading=el('div',{class:'rp-heading'}),titleWrap=el('div');titleWrap.append(translated('h1','title',{id:'rp-title',tabindex:-1}),translated('p','intro',{class:'rp-intro'}));heading.append(titleWrap,button('close',()=>closeView(),{id:'rp-back'}));
+  const heading=el('div',{class:'rp-heading'}),titleWrap=el('div');titleWrap.append(translated('h1','title',{id:'rp-title',tabindex:-1}));heading.append(iconButton('close','back',()=>closeView(),{id:'rp-back'}),titleWrap);
   const form=el('form',{id:'rp-form'});form.addEventListener('submit',event=>event.preventDefault());
   const columns=el('div',{class:'rp-columns'}),settings=el('div',{class:'rp-settings panel'}),visual=el('div',{class:'rp-visual drawing-panel'});
   const settingsTabs=el('div',{id:'rp-settings-tabs',class:'rp-settings-tabs',role:'tablist','aria-label':tr('settingsTabs')}),settingsPanels={};settings.append(settingsTabs);
   const settingsKeys=['walls','placement','clips','obstacles'];
   for(const key of settingsKeys){const label={walls:'tabWalls',placement:'tabPlacement',clips:'tabClips',obstacles:'tabObstacles'}[key],tab=button(label,()=>setSettingsTab(key),{id:'rp-tab-'+key,role:'tab','aria-controls':'rp-panel-'+key,'aria-selected':key==='walls',tabindex:key==='walls'?0:-1}),panel=el('section',{id:'rp-panel-'+key,class:'rp-settings-panel',role:'tabpanel','aria-labelledby':'rp-tab-'+key,tabindex:0});panel.hidden=key!=='walls';settingsTabs.append(tab);settingsPanels[key]=panel;settings.append(panel);tab.addEventListener('keydown',event=>{const current=settingsKeys.indexOf(key),next=event.key==='ArrowRight'?(current+1)%4:event.key==='ArrowLeft'?(current+3)%4:event.key==='Home'?0:event.key==='End'?3:-1;if(next>=0){event.preventDefault();setSettingsTab(settingsKeys[next],true);}});}
   function fieldset(key,panel){const section=el('fieldset',{class:'rp-section'});section.append(translated('legend',key));settingsPanels[panel].append(section);return section;}
-  const wallSection=fieldset('wallStage','walls');wallSection.append(translated('p','wallHint',{class:'rp-hint'}),el('div',{id:'rp-walls',class:'rp-wall-list'}));
+  const wallSection=fieldset('wallStage','walls');wallSection.append(el('div',{id:'rp-walls',class:'rp-wall-list'}));
   const wallBuilder=el('div',{id:'rp-wall-builder',class:'rp-wall-builder'});numberField(wallBuilder,'rp-wall-length','wallLength',1000,0.1);
   const turnFields=el('div',{id:'rp-wall-turn',class:'rp-fields'});numberField(turnFields,'rp-wall-angle','turn',90,0);qBuilderMax();
   function qBuilderMax(){turnFields.querySelector('input').setAttribute('max','179');}
   const turnLabel=translated('label','direction',{for:'rp-wall-direction'}),turnDirection=el('select',{id:'rp-wall-direction'});turnDirection.append(translated('option','left',{value:1}),translated('option','right',{value:-1}));turnLabel.append(turnDirection);turnFields.append(turnLabel);wallBuilder.append(turnFields,button('firstWall',appendWall,{id:'rp-add-wall',class:'rp-add-wall'}));wallSection.append(wallBuilder);
-  const sideLabel=translated('label','side',{for:'rp-side'}),side=el('select',{id:'rp-side'});side.append(translated('option','sideLeft',{value:'left'}),translated('option','sideRight',{value:'right'}));sideLabel.append(side);wallSection.append(sideLabel,translated('p','sideHint',{class:'rp-hint'}));
-  const pipe=fieldset('pipe','placement');pipe.append(el('p',{id:'rp-tool-summary',class:'rp-tool-summary'}),translated('p','toolHint',{class:'rp-hint'}));numberField(pipe,'rp-gap','gap',50);
+  const sideLabel=translated('label','side',{for:'rp-side'}),side=el('select',{id:'rp-side'});side.append(translated('option','sideLeft',{value:'left'}),translated('option','sideRight',{value:'right'}));sideLabel.append(side);wallSection.append(sideLabel);
+  const pipe=fieldset('pipe','placement'),pipeMeta=el('div',{class:'rp-placement-meta'});pipeMeta.append(el('p',{id:'rp-tool-summary',class:'rp-tool-summary'}));pipe.append(pipeMeta);numberField(pipe,'rp-gap','gap',50);
   const pipeFields=el('div',{class:'rp-fields'});pipe.append(pipeFields);numberField(pipeFields,'rp-clearance','clearance',10);
   const angleLabel=translated('label','maxAngle',{for:'rp-max-angle'}),angle=el('select',{id:'rp-max-angle','aria-describedby':'rp-angle-hint'});for(const n of [30,45,60,90])angle.append(el('option',{value:n},n+'°'));angle.value='90';angleLabel.append(angle);pipeFields.append(angleLabel);
-  const angleHelp=el('div',{class:'rp-angle-help'});angleHelp.append(el('p',{id:'rp-angle-hint',class:'rp-hint','aria-live':'polite'}),button('allow90',()=>{angle.value='90';invalidate(true);if(wall.lengths.length)generate();},{id:'rp-allow-90'}));pipe.append(angleHelp);
+  const angleHelp=el('details',{class:'rp-angle-help'}),angleInfo=el('summary',{id:'rp-angle-info','data-rp-icon-label':'angleInfo','data-rp-icon-name':'info'}),angleHelpContent=el('div',{class:'rp-help-content'});setIconButton(angleInfo,'info',tr('angleInfo'));angleHelpContent.append(el('p',{id:'rp-angle-hint',class:'rp-hint'}),button('allow90',()=>{angleHelp.open=false;angle.value='90';invalidate(true);if(wall.lengths.length)generate();},{id:'rp-allow-90'}));angleHelp.append(angleInfo,angleHelpContent);pipeMeta.append(angleHelp);
   const endFields=el('div',{class:'rp-end-fields'});pipe.append(endFields);
-  for(const key of ['start','end']){const block=el('div');block.append(translated('h3',key));const label=translated('label','wall',{for:'rp-'+key+'-wall'});label.append(segmentSelect(-1,'rp-'+key+'-wall'));block.append(label);numberField(block,'rp-'+key+'-position','position',0);endFields.append(block);}pipe.append(translated('p','positionsHint',{class:'rp-hint'}));
-  const placementContext=el('div',{class:'rp-placement-context'}),selectedLabel=translated('label','selected',{for:'rp-active-wall'});selectedLabel.append(segmentSelect(-1,'rp-active-wall'));placementContext.append(selectedLabel,translated('p','selectionHint',{class:'rp-hint'}));
+  for(const key of ['start','end']){const block=el('div');block.append(translated('h3',key));const label=translated('label','wall',{for:'rp-'+key+'-wall'});label.append(segmentSelect(-1,'rp-'+key+'-wall'));block.append(label);numberField(block,'rp-'+key+'-position','position',0);endFields.append(block);}
+  const placementContext=el('div',{class:'rp-placement-context'}),selectedLabel=translated('label','selected',{for:'rp-active-wall'});selectedLabel.append(segmentSelect(-1,'rp-active-wall'));placementContext.append(selectedLabel);
   const clipSection=fieldset('clips','clips'),obstacleSection=fieldset('obstacles','obstacles');clipSection.append(placementContext);
   const clipAction=button('addClip',()=>{if(activeWall<0)return;const row=addClip({segment:activeWall,position:placementPosition(),gap:value('rp-gap')});selectedPlacement={kind:'clip',id:row.dataset.rpId};markPlacementRows();invalidate(true);},{id:'rp-add-clip'}),obstacleAction=button('addObstacle',()=>{if(activeWall<0)return;const length=wall.lengths[activeWall],width=Math.min(200,length/4),position=Math.max(0,Math.min(length-width,placementPosition())),row=addObstacle({segment:activeWall,position,width,depth:200});selectedPlacement={kind:'obstacle',id:row.dataset.rpId};markPlacementRows();invalidate(true);},{id:'rp-add-obstacle'});
   clipSection.append(clipAction,el('div',{id:'rp-clips',class:'rp-list'}));obstacleSection.append(obstacleAction,el('div',{id:'rp-obstacles',class:'rp-list'}));
   settingsPanels.placement.append(button('generate',generate,{id:'rp-generate',class:'primary'}));
-  const drawingTop=el('div',{class:'drawing-top'});drawingTop.append(translated('h2','preview'));const modes=el('div',{class:'rp-selection-modes',role:'group'});modes.append(button('selectWallMode',()=>setSelectMode('wall'),{id:'rp-select-wall','aria-pressed':'true'}),button('selectPipe',()=>setSelectMode('pipe'),{id:'rp-select-pipe','aria-pressed':'false',disabled:''}));drawingTop.append(modes);visual.append(drawingTop);
-  const toolbar=el('div',{class:'drawing-toolbar'}),zoomControls=el('div',{class:'zoom-controls'}),zoomOut=button('zoomOut',()=>{}, {id:'rp-zoom-out','aria-label':tr('zoomOut')}),zoomIn=button('zoomIn',()=>{}, {id:'rp-zoom-in','aria-label':tr('zoomIn')}),zoomFit=button('zoomFit',()=>{}, {id:'rp-zoom-fit','aria-label':tr('zoomFit')}),zoomOutput=el('output',{id:'rp-zoom-level','aria-live':'polite'},'100%');zoomOut.removeAttribute('data-rp-text');zoomIn.removeAttribute('data-rp-text');zoomOut.textContent='−';zoomIn.textContent='+';zoomControls.append(zoomOut,zoomOutput,zoomIn,zoomFit);toolbar.append(zoomControls);visual.append(toolbar,translated('p','panHint',{class:'pan-hint'}),el('p',{id:'rp-angle-notice',class:'rp-angle-notice',role:'status','aria-live':'polite',hidden:''}));
-  const canvas=el('div',{class:'canvas-wrap'}),svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.id='rp-svg';svg.setAttribute('role','group');svg.setAttribute('tabindex','0');canvas.append(svg);visual.append(canvas);
-  const viewport=createWallViewport({svg,zoomIn,zoomOut,fit:zoomFit,output:zoomOutput});
+  const drawingTop=el('div',{class:'drawing-top rp-workspace-toolbar'}),modes=el('div',{class:'rp-selection-modes',role:'group'});modes.append(button('selectWallMode',()=>setSelectMode('wall'),{id:'rp-select-wall','aria-pressed':'true'}),button('selectPipe',()=>setSelectMode('pipe'),{id:'rp-select-pipe','aria-pressed':'false',disabled:''}));const zoomFit=iconButton('zoomFit','fit',()=>{}, {id:'rp-zoom-fit'});drawingTop.append(modes,zoomFit);visual.append(drawingTop,el('p',{id:'rp-angle-notice',class:'rp-angle-notice',role:'status','aria-live':'polite',hidden:''}));
+  const canvas=el('div',{class:'canvas-wrap'}),svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.id='rp-svg';svg.setAttribute('role','group');svg.setAttribute('tabindex','0');svg.setAttribute('aria-keyshortcuts','+ - 0 ArrowLeft ArrowRight ArrowUp ArrowDown');canvas.append(svg);visual.append(canvas);
+  const viewport=createWallViewport({svg,fit:zoomFit});
   viewport.setOnChange(state=>{cameraState=state;updateDetailAnnotations(state);});
   viewport.setOnTap(tap=>{
     if(!detailFrame)return false;const target=tap.target;if(target?.closest?.('[data-wall-group]')||target?.closest?.('[data-wall-label]')||target?.closest?.('[data-pipe-callout]'))return false;
@@ -258,13 +260,13 @@ export function initRoomPlanner({getProject,onApply,language}) {
     if(pickDrawingSetting(frame,point,pixelsPerMm))return true;
     const picked=pickWallSegment({segments:frame.layout.segments,point,pixelsPerMm,maxDistancePx:22,selectedIndex:activeWall});if(!picked)return false;selectWall(picked.index,picked.position,true,true);return true;
   });
-  const wallOverview=el('details',{id:'rp-wall-overview',class:'drawing-reference-details rp-wall-overview'});wallOverview.append(translated('summary','wallOverview'),translated('p','compactHint',{class:'rp-hint',id:'rp-dimension-hint',hidden:''}),translated('h4','wallMeasurements',{id:'rp-dimensions-title',hidden:''}),el('div',{id:'rp-wall-dimensions',class:'rp-wall-dimensions'}),translated('p','previewHint',{class:'rp-hint'}));visual.append(wallOverview);
-  const legend=el('div',{class:'rp-legend'});for(const [cls,key]of [['wall','wallLegend'],['clip','clipLegend'],['obstacle','obstacleLegend'],['route','routeLegend']]){const item=el('span');item.append(el('i',{class:'rp-key rp-key-'+cls,'aria-hidden':'true'}),translated('span',key));legend.append(item);}wallOverview.append(legend,translated('p','geometryHint',{class:'rp-hint'}));visual.append(el('p',{id:'rp-summary',class:'rp-summary','aria-live':'polite'}));
+  const wallOverview=el('details',{id:'rp-wall-overview',class:'drawing-reference-details rp-wall-overview'});wallOverview.append(translated('summary','wallOverview'),translated('h4','wallMeasurements',{id:'rp-dimensions-title',hidden:''}),el('div',{id:'rp-wall-dimensions',class:'rp-wall-dimensions'}));visual.append(wallOverview);
+  const legend=el('div',{class:'rp-legend'});for(const [cls,key]of [['wall','wallLegend'],['clip','clipLegend'],['obstacle','obstacleLegend'],['route','routeLegend']]){const item=el('span');item.append(el('i',{class:'rp-key rp-key-'+cls,'aria-hidden':'true'}),translated('span',key));legend.append(item);}wallOverview.append(legend);visual.append(el('p',{id:'rp-summary',class:'rp-summary','aria-live':'polite'}));
   const routeEditor=el('section',{id:'rp-route-editor',class:'rp-route-editor',hidden:''});
-  const pipeEditor=el('section',{id:'rp-pipe-editor',class:'rp-pipe-editor'}),partLabel=translated('label','pipePart',{for:'rp-pipe-part'}),partSelect=el('select',{id:'rp-pipe-part'});partLabel.append(partSelect);partSelect.addEventListener('change',()=>{const [type,index]=partSelect.value.split(':');selectPipe(type,Number(index),false);});pipeEditor.append(translated('h3','pipeEdit'),partLabel,translated('p','pipeConstraints',{class:'rp-hint'}),el('div',{id:'rp-pipe-fields',class:'rp-pipe-fields'}));
-  const pipeActions=el('div',{class:'rp-edit-actions'});pipeActions.append(button('undoPipe',undoPipeEdit,{id:'rp-pipe-undo',disabled:''}),button('restorePipe',restoreSafePipe,{id:'rp-pipe-restore',disabled:''}));pipeEditor.append(pipeActions,el('p',{id:'rp-pipe-feedback',class:'rp-pipe-feedback',role:'status','aria-live':'polite'}));
+  const pipeEditor=el('section',{id:'rp-pipe-editor',class:'rp-pipe-editor'}),partLabel=translated('label','pipePart',{for:'rp-pipe-part'}),partSelect=el('select',{id:'rp-pipe-part'});partLabel.append(partSelect);partSelect.addEventListener('change',()=>{const [type,index]=partSelect.value.split(':');selectPipe(type,Number(index),false);});const pipeToolbar=el('div',{class:'rp-pipe-toolbar'});pipeToolbar.append(partLabel);pipeEditor.append(pipeToolbar,el('div',{id:'rp-pipe-fields',class:'rp-pipe-fields'}));
+  const pipeActions=el('div',{class:'rp-edit-actions rp-pipe-utilities'});pipeActions.append(iconButton('undoPipe','undo',undoPipeEdit,{id:'rp-pipe-undo',disabled:''}),iconButton('restorePipe','reset',restoreSafePipe,{id:'rp-pipe-restore',disabled:''}));pipeToolbar.append(pipeActions);pipeEditor.append(el('p',{id:'rp-pipe-feedback',class:'rp-pipe-feedback',role:'status','aria-live':'polite'}));
   const adjustmentDetails=el('details',{id:'rp-pipe-adjustments',class:'rp-pipe-adjustments',hidden:''});adjustmentDetails.append(el('summary'),el('ul'));pipeEditor.append(adjustmentDetails);routeEditor.append(pipeEditor);
-  const advanced=el('details',{id:'rp-advanced',class:'rp-advanced'});advanced.append(translated('summary','advanced'),translated('p','routeHint',{class:'rp-hint'}));routeEditor.append(advanced);
+  const advanced=el('details',{id:'rp-advanced',class:'rp-advanced'});advanced.append(translated('summary','advanced'));routeEditor.append(advanced);
   const tableWrap=el('div',{class:'rp-table-wrap'}),table=el('table'),thead=el('thead'),headerRow=el('tr');headerRow.append(translated('th','point'),el('th',{},'X · mm'),el('th',{},'Y · mm'),el('th',{},''));thead.append(headerRow);table.append(thead,el('tbody',{id:'rp-points'}));tableWrap.append(table);advanced.append(tableWrap);
   const editActions=el('div',{class:'rp-edit-actions'});editActions.append(button('addPoint',addPoint,{id:'rp-add-point'}),button('validate',validate,{id:'rp-validate'}));advanced.append(editActions);visual.append(routeEditor);columns.append(settings,visual);form.append(columns);
   const legacyNotice=translated('p','legacy',{id:'rp-legacy',class:'rp-legacy',hidden:''}),status=el('p',{id:'rp-status',class:'rp-status',role:'status','aria-live':'polite'}),error=el('p',{id:'rp-error',class:'rp-error',role:'alert'}),actions=el('div',{class:'rp-actions'});actions.append(button('apply',apply,{id:'rp-apply',class:'primary',disabled:''}));dialog.append(heading,legacyNotice,form,status,error,actions);document.body.append(dialog);
@@ -315,7 +317,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
     pushedView=false;globalThis.scrollTo?.(0,returnScroll);if(returnFocus?.isConnected)returnFocus.focus({preventScroll:true});
   }
   dialog.close=()=>closeView();
-  dialog.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();closeView();}});
+  dialog.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();if(angleHelp.open){angleHelp.open=false;angleInfo.focus({preventScroll:true});}else closeView();}});
   globalThis.addEventListener?.('hashchange',()=>{if(globalThis.location?.hash==='#wall-planner'){if(!dialog.open)open();}else closeView(false);});
   globalThis.addEventListener?.('popstate',()=>{if(globalThis.location?.hash==='#wall-planner'){if(!dialog.open)open();}else closeView(false);});
   function rowField(row,key,n){const label=translated('label',key),input=el('input',{type:'number',step:'any',min:0,required:'','data-rp-field':key});input.value=String(n);label.append(input);row.append(label);return input;}
@@ -343,7 +345,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
   function removeWall(index){wall.lengths.splice(index,1);if(wall.turns.length)wall.turns.splice(index===0?0:index-1,1);updateSegmentChoices(i=>i===index?-1:i>index?i-1:i);activeWall=Number(q('rp-active-wall').value);activePosition=null;renderWallRows();invalidate(true);}
   function showError(message){error.textContent=message||'';}
   function invalidate(clear){
-    clearDetourNotice();updateAngleHelp();result=null;q('rp-apply').disabled=true;showError('');status.textContent=tr(clear?'changed':'edited');q('rp-summary').textContent='';
+    clearDetourNotice();updateAngleHelp();result=null;q('rp-apply').disabled=true;showError('');status.textContent=tr(clear?'changed':'edited');status.hidden=false;q('rp-summary').textContent='';
     if(clear&&!manualPipe){draftPoints=[];lastSafe=null;pipeUndo=[];selectedPipe=null;numericPipeInvalid=false;renderPoints();}
     else if(draftPoints.length>=2&&manualPipe){checkDraft();return;}
     else renderPoints();
@@ -351,7 +353,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
   }
   function accept(next){
     if(!next?.ok){clearDetourNotice();result=null;q('rp-apply').disabled=true;showError(roomPlannerError(next,languageValue()));status.textContent='';renderPoints();pipeFeedback(false,error.textContent);draw();persistDraft();return false;}
-    result=next;draftPoints=clone(next.points);numericPipeInvalid=false;q('rp-apply').disabled=false;showError('');status.textContent=tr('validated');q('rp-summary').textContent=next.turns.length+' '+tr('bends')+' · '+tr('length')+': '+format(next.geometricLength)+' mm';lastSafe=pipeSnapshot();renderPoints();pipeFeedback(true,tr('validated'));draw();persistDraft();return true;
+    result=next;draftPoints=clone(next.points);numericPipeInvalid=false;q('rp-apply').disabled=false;showError('');status.textContent=tr('validated');status.hidden=true;q('rp-summary').textContent=next.turns.length+' '+tr('bends')+' · '+tr('length')+': '+format(next.geometricLength)+' mm';lastSafe=pipeSnapshot();renderPoints();pipeFeedback(true,tr('validated'));draw();persistDraft();return true;
   }
   function pipeSnapshot(){return{points:clone(draftPoints),start:clone(input().start),end:clone(input().end),selected:selectedPipe?{...selectedPipe}:null,adjustments:clone(autoAdjustments),manual:manualPipe,detourContext:detourNoticePair()?clone(detourNoticeContext):null};}
   function writeAnchor(key,data){fillSegmentSelect(q('rp-'+key+'-wall'),data.segment);setNumericField(q('rp-'+key+'-position'),data.position);}
@@ -367,7 +369,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
     const lines=autoAdjustments.map(change=>(change.type==='length'?'L':'B')+(change.index+1)+': '+number(change.from)+' → '+number(change.to)+(change.type==='length'?' mm':'°'));
     summary.textContent=tr('autoAdjusted')+': '+lines.slice(0,2).join(' · ')+(lines.length>2?' (+'+(lines.length-2)+')':'');for(const line of lines)list.append(el('li',{},line));
   }
-  function pipeFeedback(valid,message){q('rp-pipe-feedback').textContent=message||'';q('rp-pipe-feedback').classList.toggle('rp-feedback-invalid',!valid);q('rp-pipe-undo').disabled=!pipeUndo.length;q('rp-pipe-restore').disabled=!lastSafe||!!result?.ok;renderAdjustments();}
+  function pipeFeedback(valid,message){q('rp-pipe-feedback').textContent=message||'';q('rp-pipe-feedback').hidden=valid||!message;q('rp-pipe-feedback').classList.toggle('rp-feedback-invalid',!valid);q('rp-pipe-undo').disabled=!pipeUndo.length;q('rp-pipe-restore').disabled=!lastSafe||!!result?.ok;renderAdjustments();}
   function checkDraft(){
     updateAngleHelp();result=null;q('rp-apply').disabled=true;
     if(pendingPipeEdit){status.textContent='';showError(pendingMessage());renderPoints();pipeFeedback(false,pendingMessage());draw();persistDraft();return false;}
@@ -403,7 +405,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
       for(let index=0;index<model.lengths.length;index++){
         const row=el('div',{class:'rp-pipe-leg','data-pipe-row':index});
         for(const type of (index<model.turns.length?['length','turn']:['length'])){
-          const ref=(type==='length'?'L':'B')+(index+1),wrap=el('div',{class:'rp-pipe-field','data-pipe-ref':ref});wrap.append(el('strong',{},ref));
+          const ref=(type==='length'?'L':'B')+(index+1),wrap=el('div',{class:'rp-pipe-field'+(type==='turn'?' rp-pipe-field-turn':''),'data-pipe-ref':ref});wrap.append(el('strong',{},ref));
           const label=translated('label',type==='length'?'pipeLength':'pipeAngle'),field=el('input',{type:'number',step:'any',min:type==='length'?0.1:0.1,required:'','data-pipe-type':type,'data-pipe-index':index,'aria-label':ref+' · '+tr(type==='length'?'pipeLength':'pipeAngle')});if(type==='turn')field.setAttribute('max','178.999999');label.append(field);wrap.append(label);
           field.addEventListener('focus',()=>{if(selectedPipe?.type!==type||selectedPipe?.index!==index)selectPipe(type,index,false);});
           if(type==='turn'){const directionLabel=translated('label','pipeDirection'),direction=el('select',{'data-pipe-direction':index,'aria-label':ref+' · '+tr('pipeDirection')});direction.append(translated('option','left',{value:1}),translated('option','right',{value:-1}));directionLabel.append(direction);wrap.append(directionLabel);}
@@ -436,11 +438,11 @@ export function initRoomPlanner({getProject,onApply,language}) {
     [...body.children].forEach((row,index)=>{row.querySelector('th').textContent=index===0?'A':index===draftPoints.length-1?'B':String(index);for(const [axis,n]of [['x',0],['y',1]])setNumericField(row.querySelector('[data-axis="'+axis+'"]'),draftPoints[index][n]);});
   }
 
-  function addPoint(){if(draftPoints.length<2||pendingPipeEdit||!validPipeFields())return;rememberPipe();clearDetourNotice();autoAdjustments=[];readPoints();const a=draftPoints.at(-2),b=draftPoints.at(-1);draftPoints.splice(draftPoints.length-1,0,[(a[0]+b[0])/2,(a[1]+b[1])/2]);manualPipe=true;numericPipeInvalid=false;result=null;q('rp-apply').disabled=true;showError('');status.textContent=tr('edited');renderPoints();pipeFeedback(false,tr('edited'));draw();persistDraft();}
+  function addPoint(){if(draftPoints.length<2||pendingPipeEdit||!validPipeFields())return;rememberPipe();clearDetourNotice();autoAdjustments=[];readPoints();const a=draftPoints.at(-2),b=draftPoints.at(-1);draftPoints.splice(draftPoints.length-1,0,[(a[0]+b[0])/2,(a[1]+b[1])/2]);manualPipe=true;numericPipeInvalid=false;result=null;q('rp-apply').disabled=true;showError('');status.textContent=tr('edited');status.hidden=false;renderPoints();pipeFeedback(false,tr('edited'));draw();persistDraft();}
   async function apply(){if(!result?.ok||numericPipeInvalid||!validSettings()||!validPipeFields())return;try{readPoints();const data=input(),checked=validateWallRoute(data,draftPoints);if(!accept(checked))return;q('rp-apply').disabled=true;await onApply({lengths:clone(checked.lengths),turns:clone(checked.turns),heading:checked.heading,start:clone(checked.start),planner:{version:2,input:clone(data),points:clone(checked.points),pipeEdited:manualPipe,...(detourNoticePair()?{pipeDetourNotice:detourNoticePair()}:{})}});dialog.close();}catch(exception){showError(exception?.message||tr('rejected'));q('rp-apply').disabled=!result?.ok;}}
   function format(n){return Number(n).toLocaleString({da:'da-DK',nb:'nb-NO',en:'en-GB'}[languageValue()]||'da-DK',{maximumFractionDigits:1});}
   function updateAngleHelp(){renderDetourNotice();const limit=value('rp-max-angle');q('rp-angle-hint').textContent=wallBendAngleHint(limit,languageValue());q('rp-allow-90').hidden=!Number.isFinite(limit)||limit<=0||limit>=90;}
-  function refresh(){updateAngleHelp();settingsTabs.setAttribute('aria-label',tr('settingsTabs'));zoomIn.setAttribute('aria-label',tr('zoomIn'));zoomOut.setAttribute('aria-label',tr('zoomOut'));zoomFit.setAttribute('aria-label',tr('zoomFit'));for(const node of dialog.querySelectorAll('[data-rp-text]')){const key=node.dataset.rpText;if(node.tagName==='LABEL'){const first=node.firstChild;if(first?.nodeType===3)first.nodeValue=tr(key);else node.prepend(document.createTextNode(tr(key)));}else node.textContent=tr(key);}const p=getProject();q('rp-tool-summary').textContent=tr('diameter')+': '+format(p.diameter)+' mm · '+tr('radius')+': '+format(p.radius)+' mm';if(opened){renderWallRows();updateSegmentChoices();renderPipeFields();}markPlacementRows();renderAdjustments();if(pendingPipeEdit){showError(pendingMessage());pipeFeedback(false,pendingMessage());}if(dialog.open)draw();}
+  function refresh(){updateAngleHelp();settingsTabs.setAttribute('aria-label',tr('settingsTabs'));for(const node of dialog.querySelectorAll('[data-rp-icon-label]'))setIconButton(node,node.dataset.rpIconName,tr(node.dataset.rpIconLabel));for(const node of dialog.querySelectorAll('[data-rp-text]')){const key=node.dataset.rpText;if(node.tagName==='LABEL'){const first=node.firstChild;if(first?.nodeType===3)first.nodeValue=tr(key);else node.prepend(document.createTextNode(tr(key)));}else node.textContent=tr(key);}const p=getProject();q('rp-tool-summary').textContent=tr('diameter')+': '+format(p.diameter)+' mm · '+tr('radius')+': '+format(p.radius)+' mm';if(opened){renderWallRows();updateSegmentChoices();renderPipeFields();}markPlacementRows();renderAdjustments();if(pendingPipeEdit){showError(pendingMessage());pipeFeedback(false,pendingMessage());}if(dialog.open)draw();}
   function defaultInput(){return defaultWallPlanInput();}
   function open(){
     let savedIssue=false;const active=document.activeElement;if(!dialog.open)returnFocus=active?.closest('#app-menu')?document.querySelector('#app-menu > summary'):active;const key=fingerprint(),reuse=opened&&key===projectKey;
@@ -468,7 +470,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
     const group=(x,y,angle,key,attrs={})=>{const p=toBase([x,y]);return node('g',{'data-screen-constant':'','data-local-key':key,transform:`translate(${p[0]} ${p[1]}) rotate(${angle||0}) scale(${inverse})`,...attrs});};
     const activate=(element,action)=>{element.addEventListener('click',action);element.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();action();}});};
     if(selectMode==='pipe'){
-      q('rp-dimension-hint').hidden=true;
+
       const selected=selectedPipe,part=selected&&(selected.type==='length'?frame.pickGeometry?.straights:frame.pickGeometry?.arcs)?.[selected.index],model=frame.model;
       if(part&&model?.ok){
         const worldCenter=[frame.cx+(state.x-frame.width/2)/frame.scale,frame.cy-(state.y-frame.height/2)/frame.scale],picked=pickPipePart({geometry:selected.type==='length'?{straights:[part],arcs:[]}:{straights:[],arcs:[part]},point:worldCenter,pixelsPerMm:frame.scale*density,maxDistancePx:1e12}),anchor=picked?worldScreen(picked.point):part.samples?.length?worldScreen(part.samples[Math.floor(part.samples.length/2)]):null;
@@ -492,7 +494,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
       const tubeWidth=frame.data.diameter*frame.scale*density;for(const part of frame.geometry?.straights||[])obstacles.push(wallSegmentFootprint(worldScreen(part.start),worldScreen(part.end),Math.max(2,tubeWidth+3)));
       for(const item of frame.gapLabelObstacles||[]){const point=toScreen([item.x,item.y]);obstacles.push(rectPolygon(...point,item.width,item.height));}
       let labels;try{labels=layoutLocalWallLabels({segments:frame.layout.segments.map(segment=>({index:segment.index,a:worldScreen(segment.start),b:worldScreen(segment.end),outward:[-segment.normal[0],segment.normal[1]],text:wallName(segment.index),dimensionText:format(segment.length)+' mm'})),width,height,obstacles,selectedIndex:activeWall});}catch{labels={dimensions:[],badges:[],groups:[],unplaced:[]};}
-      q('rp-dimension-hint').hidden=!labels.groups.length&&!labels.unplaced.length;
+
       for(const item of [...labels.dimensions,...labels.badges,...labels.groups]){
         if(item.dimensionLine)line(item.dimensionLine);for(const points of [...(item.extensionLines||[]),...(item.ticks||[])])line(points);
         if(item.leader)line(item.leader,'rp-wall-leader rp-local-wall-leader');
@@ -545,7 +547,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
     const focused=document.activeElement,focusAttribute=['data-wall-reference','data-wall-label','data-segment','data-pipe-length','data-pipe-bend'].find(key=>focused?.hasAttribute?.(key)),focusIndex=focusAttribute?focused.getAttribute(focusAttribute):null;
     const data=input(),layout=wallLayout(data),width=Math.max(280,visual.clientWidth||600),height=Math.min(width<480?310:430,Math.max(180,Math.floor((Number(globalThis.innerHeight)||1100)*0.42))),margin=Math.min(72,Math.max(42,height/5));
     dialog.setAttribute('data-select-mode',selectMode);settings.hidden=selectMode==='pipe';wallOverview.hidden=selectMode==='pipe';q('rp-route-editor').hidden=selectMode!=='pipe'||draftPoints.length<2;
-    svg.setAttribute('data-select-mode',selectMode);svg.setAttribute('data-pipe-valid',String(!!result?.ok));q('rp-select-wall').setAttribute('aria-pressed',String(selectMode==='wall'));q('rp-select-pipe').setAttribute('aria-pressed',String(selectMode==='pipe'));svg.setAttribute('height',String(height));viewport.update(width,height);svg.setAttribute('aria-label',tr('preview'));svg.replaceChildren();q('rp-wall-dimensions').replaceChildren();q('rp-dimensions-title').hidden=!wall.lengths.length||selectMode==='pipe';q('rp-wall-dimensions').hidden=selectMode==='pipe';q('rp-dimension-hint').hidden=true;
+    svg.setAttribute('data-select-mode',selectMode);svg.setAttribute('data-pipe-valid',String(!!result?.ok));q('rp-select-wall').setAttribute('aria-pressed',String(selectMode==='wall'));q('rp-select-pipe').setAttribute('aria-pressed',String(selectMode==='pipe'));svg.setAttribute('height',String(height));viewport.update(width,height);svg.setAttribute('aria-label',tr('preview'));svg.replaceChildren();q('rp-wall-dimensions').replaceChildren();q('rp-dimensions-title').hidden=!wall.lengths.length||selectMode==='pipe';q('rp-wall-dimensions').hidden=selectMode==='pipe';
     function s(tag,attrs,text,parent=svg){const node=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [key,val]of Object.entries(attrs))node.setAttribute(key,String(val));if(text!==undefined)node.textContent=text;parent.append(node);return node;}
     if(!layout.ok){s('text',{x:width/2,y:height/2,'text-anchor':'middle',class:'rp-svg-label'},wall.lengths.length?tr('invalid'):tr('previewEmpty'));return;}
     const polygons=[];for(const item of data.obstacles){try{const polygon=wallObstaclePolygon(data,item);if(polygon?.points?.every(p=>p.every(n=>Number.isFinite(n)&&Math.abs(n)<1e8)))polygons.push(polygon);}catch{}}

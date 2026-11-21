@@ -1,18 +1,19 @@
-import {initAppSharing} from './share-app.mjs?v=34';
+import {initAppSharing} from './share-app.mjs?v=35';
 import {SWAGELOK_BENDERS,getBender} from './benders.mjs';
 import {measurementMode,validateMeasurements,convertMeasurementMode,bendMarkLayout} from './measurements.mjs';
-import {roundDisplayedMarks} from './displayed-marks.mjs?v=34';
-import {isProjectId} from './project-storage.mjs?v=34';
-import {initRoomPlanner} from './room-planner.mjs?v=34';
+import {roundDisplayedMarks} from './displayed-marks.mjs?v=35';
+import {isProjectId} from './project-storage.mjs?v=35';
+import {initRoomPlanner} from './room-planner.mjs?v=35';
 import {renderOffsetVisualization} from './offset-visual.mjs';
-import {initTypography} from './typography.mjs?v=34';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=34';
-import {layoutBlankMarks} from './blank-layout.mjs?v=34';
-import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=34';
-import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=34';
+import {initTypography} from './typography.mjs?v=35';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=35';
+import {layoutBlankMarks} from './blank-layout.mjs?v=35';
+import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=35';
+import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=35';
 import{geometry,extend,triangle,practicalOffsetLength,calculate}from'./geometry.mjs';
-import {wallValidationStatus} from './wall-validation-status.mjs?v=34';
-import {createMainPipeDrawing} from './main-pipe-drawing.mjs?v=34';
+import {wallValidationStatus} from './wall-validation-status.mjs?v=35';
+import {createMainPipeDrawing} from './main-pipe-drawing.mjs?v=35';
+import {setIconButton} from './ui-icons.mjs?v=35';
 const $=id=>document.getElementById(id),fmt=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:getBender(state.benderId)?.nativeUnits==='in'?3:1}):'—';
 function newDrawingNumber(){const d=new Date(),date=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('');return 'PB-'+date+'-'+crypto.randomUUID().slice(0,6).toUpperCase();}
 function normalizeProject(s){const name=s.name.trim()||t('Mit første rør');return {...s,projectId:isProjectId(s.projectId)?s.projectId:crypto.randomUUID(),name,configured:s.configured!==false,drawingNumber:s.drawingNumber?.trim()||name};}
@@ -25,24 +26,43 @@ try{const s=JSON.parse(localStorage.getItem('pipe-bend-v1'));if(valid(s)){state=
 // the first session and migration of a legacy project without an ID.
 save();
 function sync(){for(const k of['name','stock','diameter','wall','radius'])$(k).value=state[k];$('drawing-number').value=state.drawingNumber||state.name;if($('bender-select')){$('bender-select').value=state.benderId||'';$('measurement-mode').value=measurementMode(state);updateBenderFields();}}function save(){try{localStorage.setItem('pipe-bend-v1',JSON.stringify(state));}catch{storageOK=false;}}function commit(n,roomApplied=false,replacingProject=false){const error=validateMeasurements(n);if(error)throw new RangeError(error);if(n.planner){const geo=geometry(measurementMode(n)==='vertex'?n:convertMeasurementMode(n,'vertex')),changed=!replacingProject&&!!state.planner&&!roomApplied&&JSON.stringify([state.lengths,state.turns,state.radius,state.diameter,state.heading,state.measurementMode])!==JSON.stringify([n.lengths,n.turns,n.radius,n.diameter,n.heading,n.measurementMode]),start=n.placement?.start||n.planner.points?.[0]||[0,0],points=[geo.lines[0]?.dimensionStart||geo.start,...geo.lines.map(line=>line.dimensionEnd||line.end)].map(p=>[p[0]+start[0],p[1]+start[1]]);n.planner={...n.planner,routeEdited:roomApplied?false:(changed||!!n.planner.routeEdited),points,input:{...n.planner.input,diameter:n.diameter,radius:n.radius}};}history.push(structuredClone(state));state=n;save();sync();render();}function params(){return{length:Number($('length').value)*Number($('unit').value),turn:Number($('angle').value)*sign};}function ready(){const p=params();return Number.isFinite(p.length)&&p.length>0&&(!state.lengths.length||(Number.isFinite(p.turn)&&Math.abs(p.turn)>0&&Math.abs(p.turn)<=179));}
+function refreshActionIcons(){
+ for(const [id,name,label]of [
+  ['triangle-rotate','rotate','Drej 90°'],['triangle-reset','reset','Nulstil retning'],
+  ['offset-rotate','rotate','Drej 90°'],['offset-reset','reset','Nulstil retning'],
+  ['zoom-fit','fit','Tilpas visning'],['work-open','worksheet','Arbejdsvisning'],
+  ['work-close','back','Tilbage til redigering'],['undo','undo','Fortryd'],['reset','new','Nyt rør'],
+  ['calculator-open','calculator','Lommeregner'],['pyth-info','info','Info om Pythagoras'],['offset-info','info','Info om forskydning'],
+ ])setIconButton($(id),name,t(label));
+ setIconButton($('mirror'),sign>0?'bend-left':'bend-right',t('Spejlvend buk · {direction}',{direction:t(sign>0?'Venstre':'Højre')}),{pressed:sign<0});
+ setIconButton($('triangle-mirror'),'mirror',t('Spejlvend'),{pressed:triangleMirror});
+ setIconButton($('offset-mirror'),'mirror',t('Spejlvend'),{pressed:offsetMirror});
+ setIconButton($('drawing-help').querySelector('summary'),'info',t('Info om tegningen'));
+ $('triangle-reset').disabled=triangleRotation===0&&!triangleMirror;$('offset-reset').disabled=offsetRotation===0&&!offsetMirror;
+}
+
 function render(){
  const g=geometry(state),has=state.lengths.length>0,marks=bendMarkLayout(state,getBender(state.benderId)),material=marks.supported&&has?marks.endPosition:g.used,left=state.stock-material;
  $('empty').style.display=has?'none':'flex';$('drawing-reference-details').hidden=!has;$('drawing-title').textContent=state.name;$('bend-fields').hidden=!has;$('angle').disabled=!has;
  $('editor-title').textContent=has?t('Fortsæt fra ende ')+end:t('Start med første stykke');
- $('editor-help').textContent=has?t('Vælg vinkel og længde. Spejlvend bukket for at vælge den anden side.'):t('Tilføj første længde, og tryk derefter på ende A eller B.');
  $('add').textContent=!state.configured?t('Opret rør'):has?t('Tilføj buk & stykke'):t('Tilføj første stykke');
- $('side').textContent=sign>0?t('Venstre'):t('Højre');$('undo').disabled=!history.length;
+ refreshActionIcons();$('undo').disabled=!history.length;
  $('remaining').innerHTML=fmt(left)+' <small>mm</small>';$('remaining').style.color=left<0?'#b64235':'';
  $('used').textContent=fmt(material)+' mm · '+t(marks.supported&&has?'Kaplængde efter værktøjstabel':'Geometrisk rørlængde');$('total').textContent=t('af ')+fmt(state.stock)+' mm';$('progress').max=state.stock;$('progress').value=material;
  $('material-status').textContent=left<0?t('Røret er ')+fmt(-left)+t(' mm for kort'):g.arcs.length+t(' buk · buelængder medregnet');
  let preview=null,previewError='';if(has&&ready()){const next=extend(state,end,params().length,params().turn);previewError=validateMeasurements(next)||'';if(!previewError)preview=geometry(next);}
  $('error').textContent=!storageOK?t('Automatisk lagring er utilgængelig. Gem projektet som fil.'):previewError;
  $('add').disabled=state.configured&&(!ready()||!!previewError);
- $('room-plan-status').textContent=state.planner?t(state.planner.routeEdited?'Røret er rettet. Åbn vægforløbet for at kontrollere klammer og forhindringer igen.':'Forslag langs vægforløbet. Længder og vinkler kan redigeres.'):'';
+ $('room-plan-status').textContent=state.planner?.routeEdited?t('Vægkontrol: kræver ny kontrol'):'';
  $('drawing-mode').textContent=t(measurementMode(state)==='vertex'?'Mål til centerlinjehjørner':'Lige længder mellem tangentpunkter')+(getBender(state.benderId)?' · '+getBender(state.benderId).model:'');
- $('length-label').textContent=t(measurementMode(state)==='vertex'?'Næste færdigmål til hjørne':'Næste lige stykke');
+ $('length-label').textContent=t(measurementMode(state)==='vertex'?'Færdigmål':'Lige stykke');
  renderBenderMarks($('live-marks'),state,g);draw(g,preview);updateTools();
 }
+
+// Native disclosure controls keep explanations available without occupying
+// the drawing or calculation flow. Close them before another action begins.
+document.addEventListener('pointerdown',event=>{for(const help of document.querySelectorAll('details.inline-help'))if(help.open&&!help.contains(event.target))help.open=false;});
+document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;const opened=[...document.querySelectorAll('details.inline-help')].filter(help=>help.open);if(!opened.length)return;const focused=opened.find(help=>help.contains(document.activeElement));for(const help of opened)help.open=false;event.preventDefault();event.stopPropagation();focused?.querySelector('summary')?.focus({preventScroll:true});},true);
 
 const mainPipeDrawing=createMainPipeDrawing({svg:$('drawing'),zoomIn:$('zoom-in'),zoomOut:$('zoom-out'),fit:$('zoom-fit'),output:$('zoom-level'),format:n=>fmt(n),translate:t,onEdit:openEdit,onEndpoint:label=>{end=label;render();$('angle').scrollIntoView({behavior:'smooth',block:'center'});$('angle').focus({preventScroll:true});}});
 
@@ -154,7 +174,7 @@ function updateBenderFields(){
 }
 function renderBenderMarks(container,project,g){
  container.replaceChildren();const bender=getBender(project.benderId),report=bendMarkLayout(project,bender),has=project.lengths.length>0;
- if(container.id==='live-marks')$('bender-marks').hidden=!has;
+ if(container.id==='live-marks'){$('bender-marks').hidden=!has;if(has&&bender&&!report.supported)$('bender-marks').open=true;}
  if(!has)return;
  const heading=document.createElement('h3');heading.textContent=t('Afsætningsmål på stangen');if(container.id==='work-marks')container.append(heading);
  const info=document.createElement('p');info.className='hint';
@@ -162,29 +182,30 @@ function renderBenderMarks(container,project,g){
  info.textContent=bender.model+' · Ø'+fmt(bender.tubeODmm)+' mm · R'+fmt(bender.radiusMm)+' mm';container.append(info);
  if(!report.supported){const error=document.createElement('p');error.className='mark-unavailable';error.textContent=t('Ingen afsætningstabel for denne opsætning.')+' '+(report.error||report.reason);container.append(error);return;}
  const table=document.createElement('table'),head=document.createElement('thead'),header=document.createElement('tr'),body=document.createElement('tbody');table.className='mark-table';
- for(const title of ['Buk','Vinkel','Fradrag fra forrige buk','Fra forrige mærke','Mærke fra A']){const th=document.createElement('th');th.textContent=t(title);header.append(th);}head.append(header);table.append(head,body);
+ for(const [label,title]of [['Buk','Buk'],['Vinkel','Vinkel'],['Fradrag','Fradrag fra forrige buk'],['Fra sidste','Fra forrige mærke'],['Fra A','Mærke fra A']]){const th=document.createElement('th');th.textContent=t(label);th.setAttribute('aria-label',t(title));th.setAttribute('title',t(title));header.append(th);}head.append(header);table.append(head,body);
  const displayed=roundDisplayedMarks(report,{digits:bender.nativeUnits==='in'?3:1});
  if(!displayed.ok){const error=document.createElement('p');error.className='mark-unavailable';error.textContent=t('Afsætningsmålene kunne ikke afrundes sikkert.');container.append(error);return;}
  for(const mark of displayed.marks){const row=document.createElement('tr');for(const value of [mark.id,fmt(Math.abs(mark.angle))+'°',fmt(mark.gainApplied)+' mm',fmt(mark.displayedInterval)+' mm',fmt(mark.displayedPosition)+' mm']){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}body.append(row);}
  const endRow=document.createElement('tr');for(const value of [t('Rørslut'),'—',report.gains.length?fmt(report.gains.at(-1))+' mm':'—',fmt(displayed.displayedEndInterval)+' mm',fmt(displayed.displayedEndPosition)+' mm']){const cell=document.createElement('td');cell.textContent=value;endRow.append(cell);}body.append(endRow);
  const scroll=document.createElement('div');scroll.className='mark-table-wrap';scroll.append(table);container.append(scroll);
- const explanation=document.createElement('p');explanation.className='hint';explanation.textContent=t('Fra forrige mærke viser målet fra sidste mærke; første mål er fra ende A. Mærke fra A viser det samlede mål. Værktøjets fradrag er allerede indregnet.');container.append(explanation);
- const roundingNote=document.createElement('p');roundingNote.className='hint';roundingNote.textContent=t('Delmålene beregnes fra de afrundede mærker fra A, så de stemmer med kaplængden.');container.append(roundingNote);
- if(displayed.precisionLimited){const warning=document.createElement('p');warning.className='mark-unavailable';warning.textContent=t('Et delmål er mindre end visningens præcision. Brug de samlede mærker fra A.');container.append(warning);}
- const totals=document.createElement('p');totals.className='mark-totals';totals.textContent=t('Kaplængde efter værktøjstabel')+': '+fmt(report.endPosition)+' mm · '+t('Geometrisk centerlinjelængde')+': '+fmt(g.used)+' mm';container.append(totals);
- const note=document.createElement('p');note.className='hint';note.textContent=t('Værktøjstabellens kaplængde og den ideelle centerlinjelængde er forskellige beregningsmetoder. Brug kaplængden sammen med den valgte bukkers afsætningsmetode.');container.append(note);
- const source=document.createElement('a');source.href=bender.source.url+'#page=23';source.target='_blank';source.rel='noopener noreferrer';source.textContent=t('Producentens tabel og mærkereference')+' · MS-13-43, '+bender.source.revision;container.append(source);
+ const help=document.createElement('details'),helpSummary=document.createElement('summary'),helpBody=document.createElement('div'),toolRow=document.createElement('div');help.id=container.id==='live-marks'?'live-mark-help':'work-mark-help';help.className='mark-help inline-help';helpBody.className='help-panel';setIconButton(helpSummary,'info',t('Om afsætningsmål'));help.append(helpSummary,helpBody);toolRow.className='mark-heading';container.insertBefore(toolRow,info);toolRow.append(info);
+ const explanation=document.createElement('p');explanation.className='hint';explanation.textContent=t('Fra forrige mærke viser målet fra sidste mærke; første mål er fra ende A. Mærke fra A viser det samlede mål. Værktøjets fradrag er allerede indregnet.');helpBody.append(explanation);
+ const roundingNote=document.createElement('p');roundingNote.className='hint';roundingNote.textContent=t('Delmålene beregnes fra de afrundede mærker fra A, så de stemmer med kaplængden.');helpBody.append(roundingNote);
+ if(displayed.precisionLimited){if(container.id==='live-marks')$('bender-marks').open=true;const warning=document.createElement('p');warning.className='mark-unavailable';warning.textContent=t('Et delmål er mindre end visningens præcision. Brug de samlede mærker fra A.');container.append(warning);}
+ const totals=document.createElement('div');totals.className='mark-totals';for(const [label,value,full]of [['Kaplængde',report.endPosition,'Kaplængde efter værktøjstabel'],['Geometrisk længde',g.used,'Geometrisk centerlinjelængde']]){const stat=document.createElement('div'),title=document.createElement('span'),number=document.createElement('strong');title.textContent=t(label);title.setAttribute('title',t(full));number.textContent=fmt(value)+' mm';stat.append(title,number);totals.append(stat);}container.append(totals);
+ const note=document.createElement('p');note.className='hint';note.textContent=t('Værktøjstabellens kaplængde og den ideelle centerlinjelængde er forskellige beregningsmetoder. Brug kaplængden sammen med den valgte bukkers afsætningsmetode.');helpBody.append(note);
+ const source=document.createElement('a');source.href=bender.source.url+'#page=23';source.target='_blank';source.rel='noopener noreferrer';source.textContent=t('Producentens tabel og mærkereference')+' · MS-13-43, '+bender.source.revision;helpBody.append(source);container.append(help);
 }
 
 $('add-form').onsubmit=e=>{e.preventDefault();if(!state.configured){openPipeSettings('new');return;}if(!ready())return;if(state.lengths.length>=200){alert(t('Maks. 200 stykker pr. projekt.'));return;}const next=extend(state,end,params().length,params().turn),error=validateMeasurements(next);if(error){$('error').textContent=error;return;}commit(next);};$('mirror').onclick=()=>{sign*=-1;render();};for(const k of['length','angle','unit'])$(k).oninput=render;$('undo').onclick=()=>{if(history.length){state=history.pop();save();sync();render();}};$('reset').onclick=()=>openPipeSettings('new');
 
-let py=NaN,off=NaN;function updateTools(){py=triangle($('solve').value,+$('p1').value,+$('p2').value);$('pyth-result').textContent=fmt(py)+' mm';$('use-pyth').disabled=!Number.isFinite(py)||py<=0;$('pyth-angle').textContent=Number.isFinite(py)?t('a² + b² = c² · Retvinklet trekant'):t('Hypotenusen skal være større end den kendte katete.');drawTriangle();const displacement=Number($('offset').value),bendAngle=Number($('offset-angle').value),factor=Number($('offset-factor').value),offsetUnit=$('offset-unit').value;
+let py=NaN,off=NaN;function updateTools(){py=triangle($('solve').value,+$('p1').value,+$('p2').value);$('pyth-result').textContent=fmt(py)+' mm';$('use-pyth').disabled=!Number.isFinite(py)||py<=0;$('pyth-angle').textContent=Number.isFinite(py)?'':t('Hypotenusen skal være større end den kendte katete.');$('pyth-angle').hidden=Number.isFinite(py);drawTriangle();const displacement=Number($('offset').value),bendAngle=Number($('offset-angle').value),factor=Number($('offset-factor').value),offsetUnit=$('offset-unit').value;
  off=bendAngle>0&&bendAngle<=90?practicalOffsetLength(displacement,factor):NaN;
- const formatOffset=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:3}):'—',formatFactor=n=>n.toLocaleString(locales[language],{maximumFractionDigits:12});
+ const formatOffset=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:3}):'—';
  $('offset-result').textContent=formatOffset(off)+' '+offsetUnit;
- $('offset-formula').textContent=Number.isFinite(off)?formatOffset(displacement)+' × '+formatFactor(factor)+' = '+formatOffset(off)+' '+offsetUnit:t('Kontrollér forskydning, vinkel og faktor.');
+ $('offset-formula').textContent=Number.isFinite(off)?'':t('Kontrollér forskydning, vinkel og faktor.');$('offset-formula').hidden=Number.isFinite(off);
  renderOffsetVisualization($('offset-svg'),{offset:displacement,angle:bendAngle,length:off,factor,unit:offsetUnit,rotation:offsetRotation,mirror:offsetMirror},t,formatOffset);
- $('offset-mirror').setAttribute('aria-pressed',String(offsetMirror));}$('solve').onchange=()=>{const m=$('solve').value;$('p1-label').firstChild.textContent=(m==='a'?'b':'a')+' · mm';$('p2-label').firstChild.textContent=(m==='c'?'b':'c')+' · mm';updateTools();};for(const k of['p1','p2','offset','offset-factor'])$(k).oninput=updateTools;$('offset-angle').oninput=()=>{const a=Number($('offset-angle').value);if(a>0&&a<=90)$('offset-factor').value=a===45?'1.4':String(Number((1/Math.sin(a*Math.PI/180)).toFixed(3)));updateTools();};let currentOffsetUnit='cm';$('offset-unit').onchange=()=>{const next=$('offset-unit').value;if(next!==currentOffsetUnit){$('offset').value=String(Number($('offset').value)*(next==='mm'?10:.1));currentOffsetUnit=next;}updateTools();};function use(v){$('length').value=Math.round(v*1000)/1000;$('unit').value='1';render();$('length').scrollIntoView({behavior:'smooth',block:'center'});$('length').focus({preventScroll:true});}$('use-pyth').onclick=()=>use(py);
+ refreshActionIcons();}$('solve').onchange=()=>{const m=$('solve').value;$('p1-label').firstChild.textContent=(m==='a'?'b':'a')+' · mm';$('p2-label').firstChild.textContent=(m==='c'?'b':'c')+' · mm';updateTools();};for(const k of['p1','p2','offset','offset-factor'])$(k).oninput=updateTools;$('offset-angle').oninput=()=>{const a=Number($('offset-angle').value);if(a>0&&a<=90)$('offset-factor').value=a===45?'1.4':String(Number((1/Math.sin(a*Math.PI/180)).toFixed(3)));updateTools();};let currentOffsetUnit='cm';$('offset-unit').onchange=()=>{const next=$('offset-unit').value;if(next!==currentOffsetUnit){$('offset').value=String(Number($('offset').value)*(next==='mm'?10:.1));currentOffsetUnit=next;}updateTools();};function use(v){$('length').value=Math.round(v*1000)/1000;$('unit').value='1';render();$('length').scrollIntoView({behavior:'smooth',block:'center'});$('length').focus({preventScroll:true});}$('use-pyth').onclick=()=>use(py);
 const MAX_PROJECT_FILE_BYTES=2*1024*1024;
 $('export').onclick=()=>{
  try{
@@ -222,7 +243,7 @@ let calc=NaN;function calcUpdate(){try{calc=calculate($('expression').value);$('
 function drawTriangle(){
  const svg=$('triangle-svg'),mode=$('solve').value,p=+$('p1').value,q=+$('p2').value;
  svg.replaceChildren();
- if(!Number.isFinite(py)||py<=0){svg.hidden=true;$('triangle-help').textContent=t('Indtast to gyldige sidelængder for at se trekanten.');return;}
+ refreshActionIcons();if(!Number.isFinite(py)||py<=0){svg.hidden=true;$('triangle-help').textContent=t('Indtast to gyldige sidelængder for at se trekanten.');$('triangle-help').hidden=false;return;}
  svg.hidden=false;
  const sides=mode==='c'?{a:p,b:q,c:py}:mode==='a'?{a:py,b:p,c:q}:{a:p,b:py,c:q};
  const angle=triangleRotation*Math.PI/180;
@@ -230,7 +251,7 @@ function drawTriangle(){
  const raw=[[0,0],[sides.a,0],[0,-sides.b]].map(rotate);
  const xs=raw.map(p=>p[0]),ys=raw.map(p=>p[1]),minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys);
  const scale=Math.min(240/Math.max(maxx-minx,1e-12),160/Math.max(maxy-miny,1e-12));
- const project=p=>[210+(p[0]-(minx+maxx)/2)*scale,140+(p[1]-(miny+maxy)/2)*scale];
+ const project=p=>[210+(p[0]-(minx+maxx)/2)*scale,120+(p[1]-(miny+maxy)/2)*scale];
  const [A,B,C]=raw.map(project),center=[(A[0]+B[0]+C[0])/3,(A[1]+B[1]+C[1])/3];
  function el(tag,attrs,text){const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);if(text)e.textContent=text;svg.append(e);return e;}
  el('polygon',{points:[A,B,C].map(p=>p.join(',')).join(' '),fill:'#eaf5ef'});
@@ -244,7 +265,7 @@ function drawTriangle(){
  el('polyline',{points:mark.map(p=>p.join(',')).join(' '),fill:'none',stroke:'#76988b','stroke-width':1.5});
  $('triangle-mirror').setAttribute('aria-pressed',String(triangleMirror));
  svg.setAttribute('aria-label',t('Retvinklet trekant: a {a} mm, b {b} mm, c {c} mm. Beregnet side {side}.',{a:fmt(sides.a),b:fmt(sides.b),c:fmt(sides.c),side:mode}));
- $('triangle-help').textContent=t('Alle mål i mm · Grøn side er den beregnede ')+mode+t(' · Drejet ')+triangleRotation+'°'+(triangleMirror?t(' · Spejlvendt'):'');
+ $('triangle-help').textContent='';$('triangle-help').hidden=true;
 }
 $('pyth-visual').addEventListener('toggle',()=>{$('pyth-visual').querySelector('summary').textContent=$('pyth-visual').open?t('Skjul trekant'):t('Vis trekant');});
 
@@ -305,7 +326,7 @@ function drawBlank(g,marks){
  svg.setAttribute('aria-label',t(practical?'Afsætningsmærker fra ende A efter værktøjstabel':'Geometriske tangentpunkter fra ende A'));
 }
 function openWork(){renderWork();document.body.classList.add('work-mode');$('work-sheet').hidden=false;window.scrollTo(0,0);$('work-close').focus({preventScroll:true});}
-$('work-open').onclick=openWork;$('work-close').onclick=()=>{document.body.classList.remove('work-mode');$('work-sheet').hidden=true;$('work-open').scrollIntoView({block:'center'});$('work-open').focus({preventScroll:true});};$('work-print').onclick=()=>{renderWork();window.print();};window.addEventListener('beforeprint',()=>{renderWork();document.body.classList.add('printing-work');$('work-sheet').hidden=false;});window.addEventListener('afterprint',()=>{document.body.classList.remove('printing-work');if(!document.body.classList.contains('work-mode'))$('work-sheet').hidden=true;});
+$('work-open').onclick=openWork;$('work-close').onclick=()=>{document.body.classList.remove('work-mode');$('work-sheet').hidden=true;$('work-open').scrollIntoView({block:'center'});$('work-open').focus({preventScroll:true});};$('work-print').onclick=()=>{renderWork();window.print();};window.addEventListener('beforeprint',()=>{renderWork();document.body.classList.add('printing-work');$('work-sheet').hidden=false;for(const help of $('work-marks').querySelectorAll('details.mark-help'))help.open=true;});window.addEventListener('afterprint',()=>{document.body.classList.remove('printing-work');if(!document.body.classList.contains('work-mode'))$('work-sheet').hidden=true;});
 $('work-svg').onclick=()=>{
  renderWork();
  const wallStatus=wallValidationStatus(state),svg=$('work-drawing').cloneNode(true),ns='http://www.w3.org/2000/svg';svg.setAttribute('xmlns',ns);svg.setAttribute('width','1200');

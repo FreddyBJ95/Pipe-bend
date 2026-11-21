@@ -1,4 +1,18 @@
 const messages={
+  "Fradrag": {"nb": "Fradrag", "en": "Deduction"},
+  "Fra sidste": {"nb": "Fra forrige", "en": "From last"},
+  "Fra A": {"nb": "Fra A", "en": "From A"},
+  "Spejlvend buk": {"nb": "Speilvend bøy", "en": "Mirror bend"},
+  "Spejlvend buk · {direction}": {"nb": "Speilvend bøy · {direction}", "en": "Mirror bend · {direction}"},
+  "Drej 90°": {"nb": "Drei 90°", "en": "Rotate 90°"},
+  "Spejlvend": {"nb": "Speilvend", "en": "Mirror"},
+  "Info om tegningen": {"nb": "Info om tegningen", "en": "About the drawing"},
+  "Om afsætningsmål": {"nb": "Om avsettingsmål", "en": "About layout marks"},
+  "Kaplængde": {"nb": "Kappelengde", "en": "Cut length"},
+  "Geometrisk længde": {"nb": "Geometrisk lengde", "en": "Geometric length"},
+  "Vinkel · °": {"nb": "Vinkel · °", "en": "Angle · °"},
+  "Færdigmål": {"nb": "Ferdigmål", "en": "Finished length"},
+  "Lige stykke": {"nb": "Rett stykke", "en": "Straight length"},
   "Projektet kunne ikke indlæses. Det åbne projekt er bevaret. Kontrollér browserens lagring, og prøv igen.": {
     "nb": "Prosjektet kunne ikke lastes inn. Det åpne prosjektet er beholdt. Kontroller nettleserens lagring og prøv igjen.",
     "en": "The project could not be loaded. The open project has been kept. Check browser storage and try again."

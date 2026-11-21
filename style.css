@@ -121,3 +121,44 @@ main{padding-top:20px}
  body.wall-planner-active>.site-header{grid-template-areas:"brand menu"}
 }
 @media(max-width:360px){.site-header{padding-left:8px;padding-right:8px}.site-header .project-actions{gap:4px}.site-header .project-actions button{font-size:12px;padding-inline:3px}}
+
+/* Compact actions keep their native button/summary semantics and touch size. */
+.icon-button{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;min-width:44px;min-height:44px;max-width:44px;padding:10px;flex:0 0 44px;line-height:1;border-radius:7px;vertical-align:middle}
+.icon-button svg{display:block;width:22px;height:22px;flex:none;pointer-events:none}
+.icon-button[aria-pressed=true]{color:#12684c;border-color:#7ba28f;background:#eaf5ee}
+.icon-button:focus-visible{outline:2px solid #169c72;outline-offset:2px}
+.drawing-top{padding-bottom:10px}.drawing-toolbar{gap:8px;padding-top:0;flex-wrap:wrap}.drawing-actions{display:flex;gap:6px;align-items:center}
+.drawing-top>div:first-child{min-width:0}#drawing-title{overflow-wrap:anywhere}
+#zoom-fit.icon-button{min-width:44px}.drawing-toolbar .zoom-controls{gap:4px}.drawing-toolbar .zoom-controls output{min-width:36px}
+.drawing-context{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:6px 24px 10px;color:#5e786b}
+.drawing-context .drawing-mode{font-size:12px;line-height:1.4;margin:0}.drawing-context .dimensions-unit{margin:0;font-size:12px;white-space:nowrap}
+.inline-help{position:relative;flex:none}.inline-help>summary{list-style:none;cursor:pointer;border:1px solid #d6dfe0;background:#fff;color:#557968}
+.inline-help>summary::-webkit-details-marker{display:none}.inline-help>summary:hover,.inline-help[open]>summary{background:#edf6f0;border-color:#7ba28f}
+.inline-help>.help-panel{position:absolute;z-index:35;inset-inline-end:0;top:calc(100% + 6px);width:min(340px,calc(100vw - 40px));max-height:65vh;overflow:auto;padding:14px;background:#fff;border:1px solid #d6e3da;border-radius:8px;box-shadow:0 6px 20px #18303724;text-align:left}
+.inline-help:not([open])>.help-panel{display:none}.inline-help>.help-panel p{font-size:13px;line-height:1.5;margin:0 0 10px}.inline-help>.help-panel p:last-child{margin-bottom:0}
+.drawing-toolbar{position:relative}#drawing-help{position:static}#drawing-help>.help-panel{inset-inline-end:10px;width:min(340px,calc(100% - 20px))}
+.help-panel a{font-size:13px;color:#176748;overflow-wrap:anywhere}.tool-error{font-size:13px;color:#a04532;margin:8px 0 0;line-height:1.5}.tool-error[hidden]{display:none!important}
+#continuation-panel #bend-fields{grid-template-columns:minmax(0,1fr) 44px;gap:6px}#continuation-panel .mirror.icon-button{width:44px;min-width:44px;margin:0}
+#continuation-panel .bottom{display:flex;gap:6px;justify-content:flex-end;margin-top:8px}#continuation-panel .bottom button.icon-button{width:44px;flex:0 0 44px}
+.triangle-controls{justify-content:flex-end;gap:6px;margin:8px 0 6px}.triangle-controls .icon-button{flex:0 0 44px;padding:10px}
+.triangle-frame{padding:4px;margin-top:4px}.tool .result{margin-top:12px}.tool .pyth-visual{margin-top:12px;padding-top:4px}
+#live-marks,#work-marks{position:relative}.mark-heading{padding-right:52px;margin-bottom:8px}.mark-heading>.hint{margin:0;font-size:13px;line-height:1.5;min-height:44px;display:flex;align-items:center}
+.mark-help.inline-help{position:absolute;top:0;inset-inline-end:0}.mark-totals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0 4px;font-variant-numeric:tabular-nums}
+.mark-totals span{display:block;color:#627d70;font-size:12px;line-height:1.4;font-weight:400}.mark-totals strong{display:block;margin-top:3px;color:#176748;font-size:18px;line-height:1.4;font-weight:600}
+.mark-table th{font-size:12px;padding:8px 6px}
+.work-toolbar>#work-close.icon-button{width:44px;flex:none}
+@media(max-width:720px){
+ .drawing-toolbar{padding:0 10px;gap:6px;flex-wrap:nowrap}.drawing-context{padding:6px 12px 8px}.drawing-actions{gap:4px}
+ .drawing-toolbar .zoom-controls output{min-width:32px;font-size:12px}.drawing-toolbar .icon-button{padding:10px}
+ #continuation-panel #add-form{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+ #continuation-panel #add-form>label{flex:1 1 148px;min-width:0}#continuation-panel #bend-fields{flex:1 1 124px;min-width:0}
+ #continuation-panel #add-form .length-input{display:grid;grid-template-columns:minmax(0,1fr) 58px;gap:5px}#continuation-panel .length-input input,#continuation-panel .length-input select{width:100%;min-width:0}
+ #continuation-panel #add{flex:1 0 100%;margin:0}#continuation-panel .bottom{display:flex;margin-top:8px}
+ #continuation-panel label{font-size:12px}.triangle-controls{margin:5px 0}.tool .pyth-visual{margin-top:8px}.mark-totals strong{font-size:17px}
+}
+@media(max-width:310px){.drawing-toolbar{flex-wrap:wrap;justify-content:space-between}.drawing-context{padding-inline:10px}}
+@media print{
+ .mark-help.inline-help{position:static;margin-top:10px}.mark-help>summary{display:none!important}.mark-help>.help-panel{display:block!important;position:static;width:auto;max-height:none;overflow:visible;padding:0;border:0;box-shadow:none}
+ .mark-help>.help-panel p,.mark-help>.help-panel a{font-size:10px}.mark-heading{padding-right:0;margin-bottom:4px}.mark-heading>.hint{min-height:0;font-size:10px}
+ .mark-totals{margin-top:8px;gap:10px}.mark-totals span{font-size:10px}.mark-totals strong{font-size:13px}
+}
