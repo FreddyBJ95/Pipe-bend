@@ -1,8 +1,8 @@
-import {generateWallRoute,validateWallRoute,wallLayout,pointOnWall,wallObstaclePolygon} from './wall-routing.mjs?v=27';
-import {layoutWallLabels,wallSegmentFootprint,wallDirectionArrow} from './wall-label-layout.mjs?v=27';
-import {rectPolygon} from './dimension-layout.mjs?v=27';
-import {pipeModelFromPoints,editWallPipe} from './wall-pipe-edit.mjs?v=27';
-import {buildRouteGeometry} from './room-routing.mjs?v=27';
+import {generateWallRoute,validateWallRoute,wallLayout,pointOnWall,wallObstaclePolygon} from './wall-routing.mjs?v=28';
+import {layoutWallLabels,wallSegmentFootprint,wallDirectionArrow} from './wall-label-layout.mjs?v=28';
+import {rectPolygon} from './dimension-layout.mjs?v=28';
+import {pipeModelFromPoints,editWallPipe,editAnchoredWallPipeLength} from './wall-pipe-edit.mjs?v=28';
+import {buildRouteGeometry} from './room-routing.mjs?v=28';
 
 const words={
   title:['Tegn vægforløb','Tegn veggforløp','Draw the wall path'],
@@ -35,6 +35,7 @@ const words={
   previewHint:['Væggen vises, mens du tegner. Tilføj mål og placeringer, og vælg derefter Foreslå rørføring.','Veggen vises mens du tegner. Legg til mål og plasseringer, og velg deretter Foreslå rørføring.','The wall appears as you draw. Add dimensions and placements, then choose Propose pipe route.'],
   geometryHint:['Forslaget kontrolleres med den valgte radius, klammer, vægge og forhindringer.','Forslaget kontrolleres med valgt radius, klammer, vegger og hindringer.','The proposal is checked against the selected radius, clips, walls and obstacles.'],
   pipeEdit:['Rediger rør','Rediger rør','Edit pipe'],pipeEditHint:['Ret rørets længder og vinkler her. Væggen ligger fast. Rettelser kontrolleres mod radius, vægge, klammer og forhindringer.','Endre rørets lengder og vinkler her. Veggen ligger fast. Endringer kontrolleres mot radius, vegger, klammer og hindringer.','Edit pipe lengths and bend angles here. The wall stays fixed. Edits are checked against radius, walls, clips and obstacles.'],
+  localLengthEdit:['Mellemstykket ændres lige meget til begge sider. Skråstykkerne følger med; A, B og resten af røret ligger fast.','Mellomstykket endres like mye til begge sider. Skråstykkene følger med; A, B og resten av røret ligger fast.','The middle section changes equally on both sides. The diagonal sections move with it; A, B and the rest of the pipe stay fixed.'],
   pipeLength:['Færdigmål til centerlinjehjørne · mm','Ferdigmål til senterlinjehjørne · mm','Finished centerline-corner length · mm'],pipeAngle:['Bukkevinkel · °','Bøyevinkel · °','Bend angle · °'],pipeDirection:['Buk mod','Bøy mot','Bend toward'],selectPipe:['Rør','Rør','Pipe'],selectWallMode:['Væg','Vegg','Wall'],modeHint:['Vælg Rør for at trykke på et rørstykke eller buk. Vælg Væg for at rette væggen og placeringerne.','Velg Rør for å trykke på et rørstykke eller en bøy. Velg Vegg for å endre veggen og plasseringene.','Choose Pipe to select a pipe section or bend. Choose Wall to edit walls and placements.'],
   pipeConstraints:['A og klammer er faste. B følger en ændret slutlængde, når enden stadig ligger på den valgte vægafstand. Andre ændringer skal passe til det valgte slutpunkt.','A og klammer er faste. B følger en endret sluttlengde når enden fortsatt ligger på valgt veggavstand. Andre endringer må passe til valgt sluttpunkt.','A and clips stay fixed. B follows an edited last length when it remains at the selected wall gap. Other edits must match the selected endpoint.'],
   undoPipe:['Fortryd rørrettelse','Angre rørendring','Undo pipe edit'],restorePipe:['Gendan seneste gyldige rør','Gjenopprett siste gyldige rør','Restore last valid pipe'],advanced:['Avanceret · hjørnepunkter X/Y','Avansert · hjørnepunkter X/Y','Advanced · corner coordinates X/Y'],unsafePipe:['Rettelsen er ikke gyldig og kan ikke bruges.','Endringen er ikke gyldig og kan ikke brukes.','This edit is invalid and cannot be applied.'],
@@ -96,6 +97,7 @@ const routeErrors={
   ZERO_LENGTH:['To hjørner ligger i samme punkt. Flytt eller fjern ett av punktene.','Two corners are at the same point. Move or remove one of them.'],
   REVERSAL:['Rørføringen snur rett tilbake i et hjørne. Flytt eller fjern dette hjørnet.','The route doubles directly back at a corner. Move or remove that corner.'],
   MAX_ANGLE:['En bøy på {angle}° overstiger maksimal vinkel på {limit}°. Flytt hjørnet eller øk den tillatte vinkelen.','A {angle}° bend exceeds the {limit}° maximum. Move the corner or increase the allowed angle.'],
+  LOCAL_EDIT_SPACE:['Det er ikke plass til denne lengden mellom de faste rørstykkene. Velg en kortere lengde.','There is not enough room for this length between the fixed pipe sections. Choose a shorter length.'],
   INSUFFICIENT_STRAIGHT:['Det er ikke plass til bøyeradiusen mellom hjørnene. Flytt punktene lenger fra hverandre eller bruk mindre radius.','There is not enough straight length for the bend radius between corners. Move the points farther apart or use a smaller radius.'],
   WALL_COLLISION:['Røret kommer for nær eller krysser en tegnet vegg. Flytt hjørnene til riktig side av veggen.','The pipe is too close to or crosses a drawn wall. Move the corners to the selected pipe side.'],
   OBSTACLE_COLLISION:['Røret treffer en hindring eller har for liten fri avstand. Flytt hjørnene lenger fra hindringen.','The pipe hits an obstacle or has insufficient clearance. Move the corners farther from the obstacle.'],
@@ -252,12 +254,17 @@ export function initRoomPlanner({getProject,onApply,language}) {
     const field=q('rp-pipe-fields').querySelector('[data-pipe-type="'+type+'"][data-pipe-index="'+index+'"]');
     if(!field||!field.reportValidity()||!Number.isFinite(Number(field.value))){numericPipeInvalid=true;result=null;q('rp-apply').disabled=true;showError(tr('invalid'));pipeFeedback(false,tr('invalid'));draw();return;}
     let nextValue=fieldValue(field);if(type==='turn')nextValue=Math.abs(nextValue)*Number(q('rp-pipe-fields').querySelector('[data-pipe-direction="'+index+'"]').value);
-    const changed=editWallPipe(draftPoints,{type,index,value:nextValue});
-    if(!changed.ok){numericPipeInvalid=true;result=null;q('rp-apply').disabled=true;showError(tr('invalid'));pipeFeedback(false,tr('invalid'));draw();return;}
+    let changed,localLength=false;
+    if(type==='length'){
+      const anchored=editAnchoredWallPipeLength(draftPoints,{index,value:nextValue});
+      localLength=anchored.applicable===true;
+      changed=anchored.applicable===false?editWallPipe(draftPoints,{type,index,value:nextValue}):anchored;
+    }else changed=editWallPipe(draftPoints,{type,index,value:nextValue});
+    if(!changed.ok){const message=roomPlannerError(changed,languageValue());numericPipeInvalid=true;result=null;q('rp-apply').disabled=true;showError(message);pipeFeedback(false,message);draw();return;}
     const different=JSON.stringify(changed.points)!==JSON.stringify(draftPoints);
     if(different)rememberPipe();draftPoints=clone(changed.points);numericPipeInvalid=false;manualPipe=true;
-    if(type==='length'&&index===changed.lengths.length-1)followEndAlongWall();
-    checkDraft();
+    if(!localLength&&type==='length'&&index===changed.lengths.length-1)followEndAlongWall();
+    const valid=checkDraft();if(localLength)pipeFeedback(valid,(valid?tr('validated'):error.textContent)+' '+tr('localLengthEdit'));
   }
   function followEndAlongWall(){
     const config=input(),layout=wallLayout(config),segment=layout.ok&&layout.segments[config.end.segment],point=draftPoints.at(-1);if(!segment||!point)return;

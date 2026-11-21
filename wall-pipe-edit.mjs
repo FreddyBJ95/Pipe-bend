@@ -94,3 +94,58 @@ export function editWallPipe(points, edit) {
   result.heading=model.heading;
   return result;
 }
+
+/**
+ * Change the width of a local offset without moving its fixed surroundings.
+ * The five-leg pattern is support / ramp / plateau / return / support. Its
+ * three parallel legs share a direction, while the two ramps have opposite
+ * transverse directions. Both ramp pairs move by half the requested change.
+ *
+ * `applicable:false` is returned only for an otherwise valid edit outside this
+ * pattern. A recognized pattern that cannot fit returns `applicable:true` and
+ * `ok:false`; callers must never fall back to a downstream-moving edit then.
+ * Radius, obstacle, wall and clip validation remains validateWallRoute's job.
+ */
+export function editAnchoredWallPipeLength(points, edit) {
+  const model=pipeModelFromPoints(points);
+  if(!model.ok)return {...model,applicable:true};
+  if(!edit || !Number.isInteger(edit.index) || edit.index<0 || edit.index>=model.lengths.length) {
+    return {...fail('Det valgte rørstykke findes ikke.', 'INVALID_EDIT'),applicable:true};
+  }
+  const {index,value}=edit;
+  if(!finite(value) || value<=0 || value>MAX_LENGTH) {
+    return {...fail('Rørlængden skal være positiv og inden for tegningens mål.', 'INVALID_INPUT', {index}),applicable:true};
+  }
+  const unsupported=()=>({...fail('Dette stykke er ikke midterstykket i en lokal forskydning.', 'UNSUPPORTED_LOCAL_EDIT', {index}),applicable:false});
+  if(index<2 || index+2>=model.lengths.length)return unsupported();
+  const unit=segment=>{
+    const dx=points[segment+1][0]-points[segment][0],dy=points[segment+1][1]-points[segment][1];
+    const scale=Math.max(Math.abs(dx),Math.abs(dy)),x=dx/scale,y=dy/scale,norm=Math.hypot(x,y);
+    return [x/norm,y/norm];
+  };
+  const dot=(a,b)=>a[0]*b[0]+a[1]*b[1],cross=(a,b)=>a[0]*b[1]-a[1]*b[0];
+  const axis=unit(index),left=unit(index-2),right=unit(index+2),rise=unit(index-1),fall=unit(index+1);
+  const sameDirection=direction=>dot(axis,direction)>0 && Math.abs(cross(axis,direction))<1e-9;
+  const riseAcross=cross(axis,rise),fallAcross=cross(axis,fall);
+  if(!sameDirection(left) || !sameDirection(right) || dot(axis,rise)<=1e-9 || dot(axis,fall)<=1e-9 ||
+    Math.abs(riseAcross)<=1e-9 || Math.abs(fallAcross)<=1e-9 || Math.sign(riseAcross)===Math.sign(fallAcross))return unsupported();
+  if(value===model.lengths[index])return {...model,applicable:true};
+  const half=(value-model.lengths[index])/2;
+  const noSpace=()=>({...fail('Der er ikke plads til den længde mellem de faste rørstykker. Vælg en kortere længde.', 'LOCAL_EDIT_SPACE', {index}),applicable:true});
+  if(model.lengths[index-2]-half<=0 || model.lengths[index+2]-half<=0)return noSpace();
+  const next=copyPoints(points);
+  for(const i of [index-1,index])next[i]=[points[i][0]-half*axis[0],points[i][1]-half*axis[1]];
+  for(const i of [index+1,index+2])next[i]=[points[i][0]+half*axis[0],points[i][1]+half*axis[1]];
+  const result=pipeModelFromPoints(next);
+  if(!result.ok)return result.code==='ZERO_LENGTH'?noSpace():{...result,applicable:true};
+  // A nearly parallel source may become numerically unstable as a support
+  // approaches zero. Do not accept a reversal or a change to another angle.
+  const directionPreserved=segment=>{
+    const dx=next[segment+1][0]-next[segment][0],dy=next[segment+1][1]-next[segment][1];
+    return dx*axis[0]+dy*axis[1]>0;
+  };
+  if(!directionPreserved(index-2) || !directionPreserved(index+2) ||
+    result.turns.some((turn,i)=>Math.abs(Math.atan2(Math.sin((turn-model.turns[i])*Math.PI/180),Math.cos((turn-model.turns[i])*Math.PI/180))*180/Math.PI)>1e-7))return noSpace();
+  result.heading=model.heading;
+  return {...result,applicable:true};
+}

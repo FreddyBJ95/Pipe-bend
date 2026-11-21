@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {pipeModelFromPoints,editWallPipe} from './wall-pipe-edit.mjs';
+import {pipeModelFromPoints,editWallPipe,editAnchoredWallPipeLength} from './wall-pipe-edit.mjs';
 import {generateWallRoute,validateWallRoute} from './wall-routing.mjs';
 
 const close=(actual,expected,tolerance=1e-8)=>assert.ok(Math.abs(actual-expected)<tolerance,`${actual} != ${expected}`);
@@ -127,4 +127,80 @@ const limited=generateWallRoute(fixture);assert.equal(limited.ok,true);
 assert.equal(validateWallRoute(fixture,editWallPipe(limited.points,{type:'turn',index:0,value:60}).points).code,'MAX_ANGLE');
 assert.deepEqual(straightConfig,configCopy,'Physical checks and draft edits do not change measured wall settings');
 
+// A middle offset width must move both ramps equally, keeping the measured
+// surroundings and both endpoints fixed. These are the user's actual L5
+// wall-notch and L11 beam plateaus, rather than a synthetic axis-only case.
+const localConfig={wall:{lengths:[1000,1000,120,120,120,1200,1800],turns:[90,90,-90,-90,90,90],heading:0,side:'left'},diameter:12,radius:38,wallGap:10,clearance:10,maxAngle:45,start:{segment:0,position:200},end:{segment:6,position:1600},clips:[{id:'lower',segment:1,position:500,gap:10},{id:'upper',segment:5,position:700,gap:10}],obstacles:[{id:'beam',segment:6,position:700,width:200,depth:180}]};
+const localRoute=generateWallRoute(localConfig);
+assert.equal(localRoute.ok,true,localRoute.error);
+close(localRoute.lengths[4],190);close(localRoute.lengths[10],270);
+const localSource=structuredClone(localRoute.points), localSettings=structuredClone(localConfig);
+function checkLocal(source,index,delta) {
+  const before=pipeModelFromPoints(source),value=before.lengths[index]+delta;
+  const edited=editAnchoredWallPipeLength(source,{index,value});
+  assert.equal(edited.ok,true,edited.error);assert.equal(edited.applicable,true);
+  const ux=(source[index+1][0]-source[index][0])/before.lengths[index];
+  const uy=(source[index+1][1]-source[index][1])/before.lengths[index];
+  for(let i=0;i<source.length;i++) {
+    const shift=i===index-1||i===index?-delta/2:i===index+1||i===index+2?delta/2:0;
+    if(!shift)assert.deepEqual(edited.points[i],source[i],'All untouched vertices stay bit-exact');
+    else vectorClose(edited.points[i],[source[i][0]+shift*ux,source[i][1]+shift*uy]);
+  }
+  assert.deepEqual(edited.points[0],source[0]);assert.deepEqual(edited.points.at(-1),source.at(-1));
+  close(edited.lengths[index],value);
+  for(let i=0;i<before.lengths.length;i++)close(edited.lengths[i],before.lengths[i]+(i===index?delta:i===index-2||i===index+2?-delta/2:0));
+  vectorClose(edited.turns,before.turns);
+  close(edited.lengths.reduce((a,b)=>a+b,0),before.lengths.reduce((a,b)=>a+b,0));
+  const center=p=>[(p[index][0]+p[index+1][0])/2,(p[index][1]+p[index+1][1])/2];
+  vectorClose(center(edited.points),center(source));
+  assert.equal(edited.heading,before.heading);
+  return edited;
+}
+for(const originalIndex of [4,10])for(const h of [0,.731,-1.4])for(const mirrored of [false,true])for(const reverse of [false,true]) {
+  const transform=([x,y])=>{if(mirrored)y=-y;return[x*Math.cos(h)-y*Math.sin(h)+31,x*Math.sin(h)+y*Math.cos(h)-48];};
+  const source=localRoute.points.map(transform);if(reverse)source.reverse();
+  const index=reverse?source.length-2-originalIndex:originalIndex,before=structuredClone(source);
+  for(const delta of [-20,60])checkLocal(source,index,delta);
+  const same=editAnchoredWallPipeLength(source,{index,value:pipeModelFromPoints(source).lengths[index]});
+  assert.equal(same.ok,true);assert.deepEqual(same.points,source);assert.notEqual(same.points,source);
+  assert.deepEqual(source,before);
+}
+for(const index of [4,10]) {
+  for(const delta of [-20,60])assert.equal(validateWallRoute(localConfig,checkLocal(localRoute.points,index,delta).points).ok,true);
+  const data=pipeModelFromPoints(localRoute.points),consumed=data.lengths[index]+2*Math.min(data.lengths[index-2],data.lengths[index+2]);
+  for(const value of [consumed,consumed+10]){
+    const rejected=editAnchoredWallPipeLength(localRoute.points,{index,value});
+    assert.equal(rejected.ok,false);assert.equal(rejected.applicable,true);assert.equal(rejected.code,'LOCAL_EDIT_SPACE');
+  }
+}
+const notchTooNarrow=editAnchoredWallPipeLength(localRoute.points,{index:4,value:50});
+assert.equal(notchTooNarrow.ok,true);
+assert.equal(validateWallRoute(localConfig,notchTooNarrow.points).code,'WALL_COLLISION');
+const beamTooNarrow=editAnchoredWallPipeLength(localRoute.points,{index:10,value:210});
+assert.equal(beamTooNarrow.ok,true);
+assert.equal(validateWallRoute(localConfig,beamTooNarrow.points).code,'OBSTACLE_COLLISION');
+assert.deepEqual(localRoute.points,localSource);assert.deepEqual(localConfig,localSettings);
+
+// The same rigid-pair construction works with unequal acute ramp angles.
+const asymmetric=[[0,0],[100,0],[130,40],[230,40],[310,0],[410,0]];
+for(const delta of [-10,50])checkLocal(asymmetric,2,delta);
+for(const source of [
+  [[0,-1],[100,0],[130,40],[230,40],[310,0],[410,0]],
+  [[0,0],[100,0],[130,40],[230,40],[310,0],[410,1]],
+  [[200,0],[100,0],[130,40],[230,40],[310,0],[410,0]],
+  [[0,0],[140,0],[130,40],[230,40],[310,0],[410,0]],
+]) {
+  const unsupported=editAnchoredWallPipeLength(source,{index:2,value:120});
+  assert.equal(unsupported.ok,false);assert.equal(unsupported.applicable,false);
+  assert.equal(unsupported.code,'UNSUPPORTED_LOCAL_EDIT');
+}
+const endOnly=editAnchoredWallPipeLength(points,{index:0,value:1100});
+assert.equal(endOnly.applicable,false,'Nonplateau start/end edits retain the established general editor');
+assert.equal(editWallPipe(points,{type:'length',index:0,value:1100}).ok,true);
+for(const edit of [{index:4,value:0},{index:4,value:NaN},{index:4,value:1e308},{index:-1,value:100},null]) {
+  const invalid=editAnchoredWallPipeLength(localRoute.points,edit);
+  assert.equal(invalid.ok,false);assert.equal(invalid.applicable,true,'Invalid edits must not trigger a downstream fallback');
+}
+
 console.log('Wall pipe editing: stable vertex math, exact no-op, downstream edits and unchanged strict constraints PASS');
+console.log('Anchored offset widths: symmetric ramps, fixed A/B and surroundings, unchanged angles/depth/total, strict clearance and no unsafe fallback PASS');

@@ -1,13 +1,13 @@
-import {initAppSharing} from './share-app.mjs?v=27';
+import {initAppSharing} from './share-app.mjs?v=28';
 import {SWAGELOK_BENDERS,getBender} from './benders.mjs';
 import {measurementMode,validateMeasurements,convertMeasurementMode,bendMarkLayout} from './measurements.mjs';
-import {initRoomPlanner} from './room-planner.mjs?v=27';
+import {initRoomPlanner} from './room-planner.mjs?v=28';
 import {renderOffsetVisualization} from './offset-visual.mjs';
-import {initTypography} from './typography.mjs?v=27';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=27';
-import {layoutBlankMarks} from './blank-layout.mjs?v=27';
-import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=27';
-import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=27';
+import {initTypography} from './typography.mjs?v=28';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=28';
+import {layoutBlankMarks} from './blank-layout.mjs?v=28';
+import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=28';
+import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=28';
 import{geometry,extend,triangle,practicalOffsetLength,calculate}from'./geometry.mjs';
 const $=id=>document.getElementById(id),fmt=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:getBender(state.benderId)?.nativeUnits==='in'?3:1}):'—';
 function newDrawingNumber(){const d=new Date(),date=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('');return 'PB-'+date+'-'+crypto.randomUUID().slice(0,6).toUpperCase();}
