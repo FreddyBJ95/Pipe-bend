@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import {geometry3D} from './spatial-geometry.mjs?v=38';
-import {projectSpatialPoint,projectSpatialGeometry,spatialArcSamples,spatialLineVisibility,pickSpatialParts,spatialRiseLabelData,classifySpatialProjection} from './spatial-drawing.mjs?v=38';
+import {spatialLayerSelection} from './spatial-layers.mjs?v=39';
+import {geometry3D} from './spatial-geometry.mjs?v=39';
+import {projectSpatialPoint,projectSpatialGeometry,spatialArcSamples,spatialLineVisibility,pickSpatialParts,spatialRiseLabelData,classifySpatialProjection} from './spatial-drawing.mjs?v=39';
 
 const close=(a,b,epsilon=1e-7)=>assert(Math.abs(a-b)<=epsilon,`${a} != ${b}`);
 assert.deepEqual(projectSpatialPoint([12,34,56],'top'),[12,34,56]);
@@ -101,3 +102,40 @@ for(const heading of [.13,.61,1.4])for(const roll of [-71,-23,29,68]){
  }
 }
 console.log('Projection-aware annotations: readable XY/XZ corners, hidden and end-on parts, true lengths, arbitrary headings/rolls and explicit height transitions PASS');
+
+
+// A selected lower layer is not occluded by the upper layer's equal plan
+// footprint. Eligibility and IDs are still those of the original whole pipe.
+const lowerSelection=spatialLayerSelection(stacked,0),upperSelection=spatialLayerSelection(stacked,500);
+const lowerPlan=classifySpatialProjection(stacked,{view:'top',layerSelection:lowerSelection}),upperPlan=classifySpatialProjection(stacked,{view:'top',layerSelection:upperSelection});
+assert.deepEqual(lowerPlan.lines.filter(part=>part.annotate).map(part=>part.index),[0]);
+assert.deepEqual(upperPlan.lines.filter(part=>part.annotate).map(part=>part.index),[2]);
+assert(lowerPlan.arcs.every(part=>!part.annotate));assert(upperPlan.arcs.every(part=>!part.annotate));
+assert.deepEqual(classifySpatialProjection(stacked,{view:'top'}).lines.map(part=>part.annotate),stackTop.lines.map(part=>part.annotate),'All layers restores ordinary occlusion');
+assert.deepEqual(lowerPlan.lines.map(part=>part.index),[0,1,2],'Selected dimensions must never be renumbered');
+for(const height of [0,500,800]){
+ const selected=spatialLayerSelection(g,height),top=classifySpatialProjection(g,{view:'top',layerSelection:selected});
+ assert(top.lines.every((part,index)=>!part.annotate||selected.lines[index]));
+ assert(top.arcs.every((part,index)=>!part.annotate||selected.arcs[index]));
+}
+assert.deepEqual(g,before,'Layer annotation selection never edits any geometry or original index');
+console.log('Selected height-layer dimensions reveal lower overlaps, preserve original IDs, omit off-layer parts and restore full geometry: PASS');
+
+// On-demand data is an explicit inspection request: no background labels,
+// one selected original part, and strict layer isolation even for a bad input.
+for(const view of ['top','front','side','iso']){
+ const quiet=classifySpatialProjection(g,{view,labelMode:'tap'});
+ assert(quiet.lines.every(part=>!part.annotate));assert(quiet.arcs.every(part=>!part.annotate));
+ const oneLength=classifySpatialProjection(g,{view,labelMode:'tap',selected:{type:'length',index:2}});
+ assert.deepEqual(oneLength.lines.filter(part=>part.annotate).map(part=>part.index),[2]);assert(oneLength.arcs.every(part=>!part.annotate));
+ const oneBend=classifySpatialProjection(g,{view,labelMode:'tap',selected:{type:'angle',index:1}});
+ assert.deepEqual(oneBend.arcs.filter(part=>part.annotate).map(part=>part.index),[1]);assert(oneBend.lines.every(part=>!part.annotate));assert(oneBend.arcs[1].anchor?.every(Number.isFinite));
+}
+const hiddenExplicit=classifySpatialProjection(stacked,{view:'top',labelMode:'tap',selected:{type:'length',index:0}});
+assert(hiddenExplicit.lines[0].annotate,'Explicit inspection can reveal a selected hidden part without flooding the view');
+const strictLayer=classifySpatialProjection(stacked,{view:'top',layerSelection:lowerSelection,labelMode:'tap',selected:{type:'length',index:2}});
+assert(strictLayer.lines.every(part=>!part.annotate),'An off-layer selection can never leak a height into the selected layer');
+const maskedHits=pickSpatialParts(projectSpatialGeometry(stacked,'top'),[500,0],{layerSelection:lowerSelection});
+assert(maskedHits.length&&maskedHits.every(hit=>hit.type==='length'&&hit.index===0),'Layer hit testing preserves lower original indices');
+assert.deepEqual(classifySpatialProjection(g,{view:'front',labelMode:'all'}).lines.map(part=>part.annotate),frontXZ.lines.map(part=>part.annotate),'All data keeps the previous projection-aware behavior');
+console.log('On-demand labels: zero unselected labels, one original L/B selection, explicit edge-on inspection and strict layer picking: PASS');

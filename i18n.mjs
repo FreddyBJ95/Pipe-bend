@@ -996,7 +996,14 @@ const messages={
     "en": "Geometric tangent points from end A"
   },
   "Overblik":{"nb":"Oversikt","en":"Overview"},
-  "Visning i arbejdsvisningen":{"nb":"Visning i arbeidsvisningen","en":"Worksheet view"}
+  "Visning i arbejdsvisningen":{"nb":"Visning i arbeidsvisningen","en":"Worksheet view"},
+  "Lag":{"nb":"Lag","en":"Layer"},
+  "Alle lag":{"nb":"Alle lag","en":"All layers"},
+  "Vis lag i arbejdsvisningen":{"nb":"Vis lag i arbeidsvisningen","en":"Worksheet height layer"},
+  "Mål":{"nb": "Mål", "en": "Dimensions"},
+  "Alle mål":{"nb": "Alle mål", "en": "All dimensions"},
+  "Ved tryk":{"nb": "Ved trykk", "en": "On tap"},
+  "Visning af mål":{"nb": "Visning av mål", "en": "Dimension display"}
 };
 export const locales={da:'da-DK',nb:'nb-NO',en:'en-GB'};
 export let language='da';

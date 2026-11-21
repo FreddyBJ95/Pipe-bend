@@ -130,3 +130,13 @@ Projektformatversion 1 bevares med valgfrie `bendRotations` og `startFrame`; gam
 Visningsskift viser nu den valgte SVG ved at styre dens HTML-attribut direkte; SVG-elementers `hidden`-egenskab fungerer ikke som på HTML-elementer. Den skjulte tegnings kamera påvirker ikke zoomknapperne.
 
 Arbejdsvisningen viser igen én stor tegning. Vælg overblik, ovenfra, forfra, fra siden eller 3D i værktøjslinjen; SVG og udskrift bruger samme valgte side. Plane projekter beholder deres oprindelige overblikstegning. Andre sider udelader mål på stykker, der ses fra enden, skjulte stykker og buk, der kun fremstår som en streg. Ovenfra bevares symboler og højdeskift for lodrette rør. De fulde afsætningsmål og bukkedata nedenunder bevares uafhængigt af visningen.
+
+
+### Retningsrække og højdelag (v39)
+
+Venstre/højre, vandret og op/ned samt eventuelle frem/tilbage-knapper står samlet i én række. På helt smalle skærme kan rækken rulles sidelæns uden at gøre trykfladerne mindre.
+
+I arbejdsvisningen ovenfra kan Lag vise alle højder eller et bestemt højdeniveau fra A. Det valgte lag viser sine egne rørstykker og mål, selv om andre rørstykker ligger over dem i samme projektion. Ved overgange angives op/ned og næste højdeniveau. L/B-numrene bevares, og hele rørets afsætningsmål og kaplængde ændres ikke. Valget følger med i SVG og udskrift. Andre visninger viser fortsat hele røret.
+
+
+De rumlige visninger har Mål: Alle mål / Ved tryk. Ved tryk vises kun data for det valgte rørstykke eller buk; et tryk i et tomt område skjuler dem igen. I redigeringen kan den viste målmarkering trykkes igen for at rette målet. Arbejdstegningen bruger samme valg ved SVG og udskrift, og et valgt højdelag afgrænser også, hvilke dele der kan vælges. Retningen og alle afsætningsdata bevares.

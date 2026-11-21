@@ -178,3 +178,17 @@ main{padding-top:20px}
 #spatial-drawing [role="button"]{cursor:pointer}
 @media(max-width:720px){.work-toolbar{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px}.work-toolbar .work-view-control{justify-content:flex-end;min-width:0}.work-view-control select{flex:1}.work-toolbar .actions{grid-column:1/-1}.work-view-control span{display:none}}
 @media print{.work-toolbar .work-view-control{display:none!important}}
+
+/* Keep every pipe direction beside the others with full touch targets. */
+#continuation-panel #bend-fields{grid-template-columns:minmax(0,1fr)}
+#continuation-panel .spatial-bend-controls{grid-column:1/-1;max-width:100%}
+.bend-direction-options{flex-wrap:nowrap;justify-content:flex-start;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;padding:2px;gap:6px}
+.bend-direction-options>.icon-button{flex:0 0 44px;margin:0}
+#next-bend-direction{display:block;margin:4px 0 0 2px;color:#176748;font-size:13px;font-weight:600;line-height:1.4}
+@media(min-width:721px){#continuation-panel #add{grid-column:3;grid-row:1}}
+
+.work-layer-control{flex:0 1 auto}.work-layer-control select{max-width:100%;font-variant-numeric:tabular-nums}
+@media(max-width:720px){.work-toolbar>.work-layer-control{grid-column:1/-1;justify-content:flex-start}.work-layer-control span{display:block}.work-layer-control select{flex:1}}
+
+.label-mode-control{display:flex;align-items:center;gap:6px;margin:0;min-width:0}.label-mode-control>span{font-size:12px;color:#557265}.spatial-views .label-mode-control select{font-size:13px;min-width:0;flex:1}.work-toolbar>.label-mode-control{flex:0 1 auto}
+@media(max-width:720px){.spatial-views>.label-mode-control{flex:1 0 100%}.work-toolbar>#work-label-control{grid-column:1/-1;justify-content:flex-start}.work-toolbar>#work-label-control span{display:block}.work-toolbar>#work-label-control select{flex:1}}

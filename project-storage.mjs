@@ -1,4 +1,4 @@
-import {hasSpatialPipe} from './spatial-geometry.mjs?v=38';
+import {hasSpatialPipe} from './spatial-geometry.mjs?v=39';
 // Stable project identity and independently stored wall working copies.
 // A working copy is separate from the pipe that has actually been applied.
 const PREFIX='pipe-bend-wall-draft-v2:';

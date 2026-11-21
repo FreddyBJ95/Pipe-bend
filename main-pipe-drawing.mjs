@@ -1,8 +1,8 @@
-import {createWallViewport} from './wall-viewport.mjs?v=38';
-import {mainPipeToSvgPath,pipeDetailStrokeWidths} from './main-pipe-detail.mjs?v=38';
-import {layoutMainDetailAnnotations} from './main-detail-annotations.mjs?v=38';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=38';
-import {referenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=38';
+import {createWallViewport} from './wall-viewport.mjs?v=39';
+import {mainPipeToSvgPath,pipeDetailStrokeWidths} from './main-pipe-detail.mjs?v=39';
+import {layoutMainDetailAnnotations} from './main-detail-annotations.mjs?v=39';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=39';
+import {referenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=39';
 
 const NS='http://www.w3.org/2000/svg';
 const rect=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
