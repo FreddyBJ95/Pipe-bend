@@ -1,11 +1,12 @@
-import {generateWallRoute,validateWallRoute,wallLayout,pointOnWall,wallObstaclePolygon} from './wall-routing.mjs?v=30';
-import {layoutWallLabels,wallSegmentFootprint,wallDirectionArrow} from './wall-label-layout.mjs?v=30';
-import {rectPolygon} from './dimension-layout.mjs?v=30';
-import {pipeModelFromPoints} from './wall-pipe-edit.mjs?v=30';
-import {solveWallPipeEdit} from './wall-pipe-solver.mjs?v=30';
-import {buildRouteGeometry} from './room-routing.mjs?v=30';
-import {createWallViewport} from './wall-viewport.mjs?v=30';
-import {geometryToSvgPath,getWallClearanceDimensions} from './wall-detail-geometry.mjs?v=30';
+import {generateWallRoute,validateWallRoute,wallLayout,pointOnWall,wallObstaclePolygon} from './wall-routing.mjs?v=31';
+import {layoutWallLabels,wallSegmentFootprint,wallDirectionArrow} from './wall-label-layout.mjs?v=31';
+import {rectPolygon} from './dimension-layout.mjs?v=31';
+import {pipeModelFromPoints} from './wall-pipe-edit.mjs?v=31';
+import {solveWallPipeEdit} from './wall-pipe-solver.mjs?v=31';
+import {buildRouteGeometry} from './room-routing.mjs?v=31';
+import {createWallViewport} from './wall-viewport.mjs?v=31';
+import {geometryToSvgPath,getWallClearanceDimensions} from './wall-detail-geometry.mjs?v=31';
+import {projectIdentity,projectOpenKey,readWallDraft,writeWallDraft,clearWallDraft} from './project-storage.mjs?v=31';
 
 const words={
   title:['Tegn vægforløb','Tegn veggforløp','Draw the wall path'],
@@ -84,6 +85,29 @@ export function migrateRoomPlanner(planner) {
     if(!Array.isArray(next.points)||next.points.length<2||next.points.length>400||!next.points.every(p=>Array.isArray(p)&&p.length===2&&p.every(finite))){next.points=[];next.savedError=true;}
     return next;
   }catch{return invalid();}
+}
+
+/** Portable working copies may be physically invalid, but their data must be
+ * finite and editable. Empty walls/points and a rejected numeric target are
+ * legitimate drafts; malformed coordinates or metadata are rejected. */
+export function normalizeWallDraft(planner) {
+  const record=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+  const finite=value=>typeof value==='number'&&Number.isFinite(value);
+  const invalid=()=>({error:'Vægudkastet har ugyldige data. Projektet er ikke ændret.'});
+  if(!record(planner)||!Array.isArray(planner.points)||planner.points.length===1||planner.points.length>400||!Array.from(planner.points).every(p=>Array.isArray(p)&&p.length===2&&finite(p[0])&&finite(p[1])))return invalid();
+  const next=migrateRoomPlanner(planner);if(!next||next.error)return invalid();
+  const input=next.input,wall=input.wall;
+  if(wall.turns.length!==Math.max(0,wall.lengths.length-1))return invalid();
+  if(![input.start,input.end,...(input.clips||[]),...(input.obstacles||[])].every(a=>a.id===undefined||typeof a.id==='string'&&a.id.length<=256))return invalid();
+  for(const key of ['pipeEdited','routeEdited'])if(next[key]!==undefined&&typeof next[key]!=='boolean')return invalid();
+  if(next.pipeEditPending!==undefined&&next.pipeEditPending!==null){
+    const pending=next.pipeEditPending,count=next.points.length;
+    if(!record(pending)||!['length','turn'].includes(pending.type)||!Number.isInteger(pending.index)||pending.index<0||pending.index>=(pending.type==='length'?count-1:count-2)||typeof pending.raw!=='string'||pending.raw.length>100||(pending.direction!==undefined&&![1,-1].includes(pending.direction))||(pending.code!==undefined&&(typeof pending.code!=='string'||pending.code.length>100))||(pending.error!==undefined&&(typeof pending.error!=='string'||pending.error.length>2000)))return invalid();
+    next.pipeEditPending={type:pending.type,index:pending.index,raw:pending.raw,direction:pending.direction===-1?-1:1,code:pending.code||'EDIT_NO_SOLUTION',error:pending.error||'Rettelsen kunne ikke tilpasses. Røret er ikke ændret.'};
+  }
+  if(next.pipeAdjustments!==undefined&&(!Array.isArray(next.pipeAdjustments)||next.pipeAdjustments.length>400||!next.pipeAdjustments.every(change=>record(change)&&['length','turn'].includes(change.type)&&Number.isInteger(change.index)&&change.index>=0&&change.index<(change.type==='length'?next.points.length-1:next.points.length-2)&&finite(change.from)&&finite(change.to))))return invalid();
+  if(planner.points.length===0)next.savedError=false;
+  return next;
 }
 
 const routeErrors={
@@ -165,10 +189,26 @@ export function initRoomPlanner({getProject,onApply,language}) {
   const q=id=>dialog.querySelector('#'+id);
   const fieldValue=field=>field.value===field.dataset.shownValue?Number(field.dataset.originalValue):Number(field.value);
   const value=id=>fieldValue(q(id));
-  const fingerprint=()=>{const p=getProject();return JSON.stringify([p.name,p.drawingNumber,p.diameter,p.radius,p.lengths,p.turns,p.heading,p.planner]);};
-  const draftStorageKey='pipe-bend-wall-draft-v1';
-  function persistDraft(){try{localStorage.setItem(draftStorageKey,JSON.stringify({projectKey:fingerprint(),planner:{version:2,input:input(),points:clone(draftPoints),pipeEdited:manualPipe,pipeEditPending:pendingPipeEdit?clone(pendingPipeEdit):null,pipeAdjustments:clone(autoAdjustments)}}));}catch{}}
-  function storedDraft(key){try{const saved=JSON.parse(localStorage.getItem(draftStorageKey));if(saved?.projectKey!==key)return null;const planner=migrateRoomPlanner(saved.planner);if(!planner||planner.error)return null;if(Array.isArray(saved.planner.points)&&saved.planner.points.length===0)planner.savedError=false;return planner;}catch{return null;}}
+  const fingerprint=()=>projectOpenKey(getProject());
+  function draftSnapshot(){return{version:2,input:input(),points:clone(draftPoints),pipeEdited:manualPipe,pipeEditPending:pendingPipeEdit?clone(pendingPipeEdit):null,pipeAdjustments:clone(autoAdjustments)};}
+  function persistDraft(){try{writeWallDraft(getProject(),draftSnapshot(),localStorage,normalizeWallDraft);}catch{}}
+  function storedDraft(){try{return readWallDraft(getProject(),localStorage,normalizeWallDraft);}catch{return {error:tr('invalidSaved')};}}
+  function exportDraft(){
+    const draft=opened&&projectKey===fingerprint()?normalizeWallDraft(draftSnapshot()):storedDraft();
+    if(draft?.error)throw new RangeError(draft.error);
+    return draft?clone(draft):null;
+  }
+  function setDraft(project,planner){
+    const next=planner===null?null:normalizeWallDraft(planner);if(next?.error)throw new RangeError(next.error);
+    // Flush the other currently open project before switching identities. For
+    // a same-ID import the incoming copy deliberately replaces this draft.
+    if(opened&&projectKey===fingerprint()&&projectIdentity(project)!==projectIdentity(getProject()))writeWallDraft(getProject(),draftSnapshot(),localStorage,normalizeWallDraft);
+    if(next===null)clearWallDraft(project,localStorage);else writeWallDraft(project,next,localStorage,normalizeWallDraft);
+    // Do not close/persist the old DOM after this write: the host commits its
+    // new project next and can call open() to reload an already visible view.
+    opened=false;projectKey='';
+    return next?clone(next):null;
+  }
   function numberField(parent,id,key,initial,min=0) {const label=translated('label',key,{for:id}),input=el('input',{id,type:'number',step:'any',required:''});if(min!==null)input.setAttribute('min',min);input.value=String(initial);label.append(input);parent.append(label);return input;}
   function wallName(index){return tr('wall')+' '+(index+1)+' · '+format(wall.lengths[index])+' mm';}
   function segmentSelect(index,id) {const select=el('select',{'data-wall-choice':'',...(id?{id}:{})});fillSegmentSelect(select,index);return select;}
@@ -359,7 +399,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
   function defaultInput(){return defaultWallPlanInput();}
   function open(){
     let savedIssue=false;const active=document.activeElement;if(!dialog.open)returnFocus=active?.closest('#app-menu')?document.querySelector('#app-menu > summary'):active;const key=fingerprint(),reuse=opened&&key===projectKey;
-    if(!reuse){pipeUndo=[];lastSafe=null;selectedPipe=null;manualPipe=false;numericPipeInvalid=false;pendingPipeEdit=null;autoAdjustments=[];const stored=storedDraft(key)||migrateRoomPlanner(getProject().planner);savedIssue=!!(stored?.error||stored?.savedError);migrated=!!stored?.migrated;manualPipe=!!stored?.pipeEdited||!!stored?.routeEdited;writeInput(stored?.input?{...defaultInput(),...clone(stored.input)}:defaultInput());draftPoints=stored&&Array.isArray(stored.points)?clone(stored.points):[];
+    if(!reuse){pipeUndo=[];lastSafe=null;selectedPipe=null;manualPipe=false;numericPipeInvalid=false;pendingPipeEdit=null;autoAdjustments=[];const stored=storedDraft()||migrateRoomPlanner(getProject().planner);savedIssue=!!(stored?.error||stored?.savedError);migrated=!!stored?.migrated;manualPipe=!!stored?.pipeEdited||!!stored?.routeEdited;writeInput(stored?.input?{...defaultInput(),...clone(stored.input)}:defaultInput());draftPoints=stored&&Array.isArray(stored.points)?clone(stored.points):[];
       const pending=stored?.pipeEditPending,model=pipeModelFromPoints(draftPoints);if(model.ok&&pending&&['length','turn'].includes(pending.type)&&Number.isInteger(pending.index)&&pending.index>=0&&pending.index<(pending.type==='length'?model.lengths:model.turns).length&&typeof pending.raw==='string'&&pending.raw.length<100){pendingPipeEdit={type:pending.type,index:pending.index,raw:pending.raw,direction:pending.direction===-1?-1:1,code:String(pending.code||'EDIT_NO_SOLUTION'),error:String(pending.error||'Rettelsen kunne ikke tilpasses. Røret er ikke ændret.')};selectedPipe={type:pending.type,index:pending.index};numericPipeInvalid=true;manualPipe=true;}
       autoAdjustments=Array.isArray(stored?.pipeAdjustments)?stored.pipeAdjustments.filter(change=>['length','turn'].includes(change.type)&&Number.isInteger(change.index)&&change.index>=0&&Number.isFinite(change.from)&&Number.isFinite(change.to)).slice(0,400):[];result=null;q('rp-apply').disabled=true;status.textContent='';showError('');q('rp-summary').textContent='';viewport.reset();
     }
@@ -490,5 +530,5 @@ export function initRoomPlanner({getProject,onApply,language}) {
   globalThis.addEventListener?.('resize',()=>{if(dialog.open)draw();});
   refresh();
   if(globalThis.location?.hash==='#wall-planner')queueMicrotask(()=>open());
-  return {open,refresh};
+  return {open,refresh,exportDraft,setDraft,validateDraft:normalizeWallDraft,isOpen:()=>!!dialog.open};
 }

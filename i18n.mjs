@@ -1,4 +1,44 @@
 const messages={
+  "Projektet kunne ikke indlæses. Det åbne projekt er bevaret. Kontrollér browserens lagring, og prøv igen.": {
+    "nb": "Prosjektet kunne ikke lastes inn. Det åpne prosjektet er beholdt. Kontroller nettleserens lagring og prøv igjen.",
+    "en": "The project could not be loaded. The open project has been kept. Check browser storage and try again."
+  },
+  "Vægkontrol: kontrolleret": {
+    "nb": "Veggkontroll: kontrollert",
+    "en": "Wall check: validated"
+  },
+  "Vægkontrol: kræver ny kontrol": {
+    "nb": "Veggkontroll: må kontrolleres på nytt",
+    "en": "Wall check: recheck required"
+  },
+  "Åbn vægforløbet, og kontrollér røret igen.": {
+    "nb": "Åpne veggforløpet og kontroller røret på nytt.",
+    "en": "Open the wall workspace and validate the pipe again."
+  },
+  "Delmålene beregnes fra de afrundede mærker fra A, så de stemmer med kaplængden.": {
+    "nb": "Delmålene beregnes fra de avrundede merkene fra A, slik at de stemmer med kappelengden.",
+    "en": "Step measurements use the rounded marks from A so they add up to the cut length."
+  },
+  "Afsætningsmålene kunne ikke afrundes sikkert.": {
+    "nb": "Avsettingsmålene kunne ikke avrundes på en sikker måte.",
+    "en": "The layout marks could not be rounded safely."
+  },
+  "Et delmål er mindre end visningens præcision. Brug de samlede mærker fra A.": {
+    "nb": "Et delmål er mindre enn visningens presisjon. Bruk de samlede merkene fra A.",
+    "en": "A step is smaller than the display precision. Use the cumulative marks from A."
+  },
+  "Projektet kunne ikke gemmes som fil. Kontrollér vægudkastet, og prøv igen.": {
+    "nb": "Prosjektet kunne ikke lagres som fil. Kontroller veggutkastet og prøv igjen.",
+    "en": "The project file could not be saved. Check the wall draft and try again."
+  },
+  "Vægudkastet i filen er ugyldigt. Det åbne projekt er bevaret.": {
+    "nb": "Veggutkastet i filen er ugyldig. Det åpne prosjektet er beholdt.",
+    "en": "The wall draft in the file is invalid. The open project has been kept."
+  },
+  "Projektet kunne ikke oprettes. Det aktuelle projekt er bevaret.": {
+    "nb": "Prosjektet kunne ikke opprettes. Det nåværende prosjektet er beholdt.",
+    "en": "The project could not be created. The current project has been kept."
+  },
   "Alle mål og buk står i listen. Tryk på en reference for at redigere.": {
     "nb": "Alle mål og bøy står i listen. Trykk på en referanse for å redigere.",
     "en": "All dimensions and bends are listed. Select a reference to edit it."

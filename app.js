@@ -1,26 +1,33 @@
-import {initAppSharing} from './share-app.mjs?v=30';
+import {initAppSharing} from './share-app.mjs?v=31';
 import {SWAGELOK_BENDERS,getBender} from './benders.mjs';
 import {measurementMode,validateMeasurements,convertMeasurementMode,bendMarkLayout} from './measurements.mjs';
-import {initRoomPlanner} from './room-planner.mjs?v=30';
+import {roundDisplayedMarks} from './displayed-marks.mjs?v=31';
+import {isProjectId} from './project-storage.mjs?v=31';
+import {initRoomPlanner} from './room-planner.mjs?v=31';
 import {renderOffsetVisualization} from './offset-visual.mjs';
-import {initTypography} from './typography.mjs?v=30';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=30';
-import {layoutBlankMarks} from './blank-layout.mjs?v=30';
-import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=30';
-import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=30';
+import {initTypography} from './typography.mjs?v=31';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=31';
+import {layoutBlankMarks} from './blank-layout.mjs?v=31';
+import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=31';
+import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=31';
 import{geometry,extend,triangle,practicalOffsetLength,calculate}from'./geometry.mjs';
+import {wallValidationStatus} from './wall-validation-status.mjs?v=31';
 const $=id=>document.getElementById(id),fmt=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:getBender(state.benderId)?.nativeUnits==='in'?3:1}):'—';
 function newDrawingNumber(){const d=new Date(),date=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('');return 'PB-'+date+'-'+crypto.randomUUID().slice(0,6).toUpperCase();}
-function normalizeProject(s){return {...s,configured:s.configured!==false,drawingNumber:s.drawingNumber?.trim()||s.name};}
+function normalizeProject(s){const name=s.name.trim()||t('Mit første rør');return {...s,projectId:isProjectId(s.projectId)?s.projectId:crypto.randomUUID(),name,configured:s.configured!==false,drawingNumber:s.drawingNumber?.trim()||name};}
 let triangleRotation=0,triangleMirror=false,editing=null,offsetRotation=0,offsetMirror=false,pipeSettingsMode='new';
 const camera={zoom:1,x:450,y:270,width:900,height:540,baseX:450,baseY:270};
-let state={version:1,configured:false,name:t('Mit første rør'),drawingNumber:newDrawingNumber(),stock:6000,diameter:12,wall:1.5,radius:38,benderId:'swagelok-ms-htb-12m',measurementMode:'vertex',heading:0,lengths:[],turns:[]},end='B',sign=1,history=[],storageOK=true;
-function valid(s){return s&&s.version===1&&typeof s.name==='string'&&s.name.length<=80&&(s.drawingNumber===undefined||(typeof s.drawingNumber==='string'&&s.drawingNumber.trim().length>0&&s.drawingNumber.length<=80))&&['stock','diameter','wall','radius','heading'].every(k=>typeof s[k]==='number'&&Number.isFinite(s[k]))&&s.stock>0&&s.diameter>0&&s.wall>0&&s.wall<s.diameter/2&&s.radius>s.diameter/2&&Array.isArray(s.lengths)&&s.lengths.length<=200&&s.lengths.every(v=>Number.isFinite(v)&&v>0)&&Array.isArray(s.turns)&&s.turns.length===Math.max(0,s.lengths.length-1)&&s.turns.every(v=>Number.isFinite(v)&&Math.abs(v)>0&&Math.abs(v)<=179)&&(s.measurementMode===undefined||['tangent','vertex'].includes(s.measurementMode))&&(s.benderId===undefined||s.benderId===null||typeof s.benderId==='string')&&!validateMeasurements(s);}
-try{const s=JSON.parse(localStorage.getItem('pipe-bend-v1'));if(valid(s))state=normalizeProject(s);}catch{}
-function sync(){for(const k of['name','stock','diameter','wall','radius'])$(k).value=state[k];$('drawing-number').value=state.drawingNumber||state.name;if($('bender-select')){$('bender-select').value=state.benderId||'';$('measurement-mode').value=measurementMode(state);updateBenderFields();}}function save(){try{localStorage.setItem('pipe-bend-v1',JSON.stringify(state));}catch{storageOK=false;}}function commit(n,roomApplied=false){const error=validateMeasurements(n);if(error)throw new RangeError(error);if(n.planner){const geo=geometry(measurementMode(n)==='vertex'?n:convertMeasurementMode(n,'vertex')),changed=!!state.planner&&!roomApplied&&JSON.stringify([state.lengths,state.turns,state.radius,state.diameter,state.heading,state.measurementMode])!==JSON.stringify([n.lengths,n.turns,n.radius,n.diameter,n.heading,n.measurementMode]),start=n.placement?.start||n.planner.points?.[0]||[0,0],points=[geo.lines[0]?.dimensionStart||geo.start,...geo.lines.map(line=>line.dimensionEnd||line.end)].map(p=>[p[0]+start[0],p[1]+start[1]]);n.planner={...n.planner,routeEdited:roomApplied?false:(changed||!!n.planner.routeEdited),points,input:{...n.planner.input,diameter:n.diameter,radius:n.radius}};}history.push(structuredClone(state));state=n;save();sync();render();}function params(){return{length:Number($('length').value)*Number($('unit').value),turn:Number($('angle').value)*sign};}function ready(){const p=params();return Number.isFinite(p.length)&&p.length>0&&Number.isFinite(p.turn)&&Math.abs(p.turn)>0&&Math.abs(p.turn)<=179;}
+let state={version:1,projectId:crypto.randomUUID(),configured:false,name:t('Mit første rør'),drawingNumber:newDrawingNumber(),stock:6000,diameter:12,wall:1.5,radius:38,benderId:'swagelok-ms-htb-12m',measurementMode:'vertex',heading:0,lengths:[],turns:[]},end='B',sign=1,history=[],storageOK=true;
+function valid(s){return s&&s.version===1&&typeof s.name==='string'&&s.name.length<=80&&(s.projectId===undefined||isProjectId(s.projectId))&&(s.drawingNumber===undefined||(typeof s.drawingNumber==='string'&&s.drawingNumber.trim().length>0&&s.drawingNumber.length<=80))&&['stock','diameter','wall','radius','heading'].every(k=>typeof s[k]==='number'&&Number.isFinite(s[k]))&&s.stock>0&&s.diameter>0&&s.wall>0&&s.wall<s.diameter/2&&s.radius>s.diameter/2&&Array.isArray(s.lengths)&&s.lengths.length<=200&&s.lengths.every(v=>Number.isFinite(v)&&v>0)&&Array.isArray(s.turns)&&s.turns.length===Math.max(0,s.lengths.length-1)&&s.turns.every(v=>Number.isFinite(v)&&Math.abs(v)>0&&Math.abs(v)<=179)&&(s.measurementMode===undefined||['tangent','vertex'].includes(s.measurementMode))&&(s.benderId===undefined||s.benderId===null||typeof s.benderId==='string')&&!validateMeasurements(s);}
+let bootEmbeddedDraft=null;
+try{const s=JSON.parse(localStorage.getItem('pipe-bend-v1'));if(valid(s)){state=normalizeProject(s);bootEmbeddedDraft=s.wallDraft??null;}}catch{}
+// Persist the project identity before any wall draft is created, including
+// the first session and migration of a legacy project without an ID.
+save();
+function sync(){for(const k of['name','stock','diameter','wall','radius'])$(k).value=state[k];$('drawing-number').value=state.drawingNumber||state.name;if($('bender-select')){$('bender-select').value=state.benderId||'';$('measurement-mode').value=measurementMode(state);updateBenderFields();}}function save(){try{localStorage.setItem('pipe-bend-v1',JSON.stringify(state));}catch{storageOK=false;}}function commit(n,roomApplied=false,replacingProject=false){const error=validateMeasurements(n);if(error)throw new RangeError(error);if(n.planner){const geo=geometry(measurementMode(n)==='vertex'?n:convertMeasurementMode(n,'vertex')),changed=!replacingProject&&!!state.planner&&!roomApplied&&JSON.stringify([state.lengths,state.turns,state.radius,state.diameter,state.heading,state.measurementMode])!==JSON.stringify([n.lengths,n.turns,n.radius,n.diameter,n.heading,n.measurementMode]),start=n.placement?.start||n.planner.points?.[0]||[0,0],points=[geo.lines[0]?.dimensionStart||geo.start,...geo.lines.map(line=>line.dimensionEnd||line.end)].map(p=>[p[0]+start[0],p[1]+start[1]]);n.planner={...n.planner,routeEdited:roomApplied?false:(changed||!!n.planner.routeEdited),points,input:{...n.planner.input,diameter:n.diameter,radius:n.radius}};}history.push(structuredClone(state));state=n;save();sync();render();}function params(){return{length:Number($('length').value)*Number($('unit').value),turn:Number($('angle').value)*sign};}function ready(){const p=params();return Number.isFinite(p.length)&&p.length>0&&(!state.lengths.length||(Number.isFinite(p.turn)&&Math.abs(p.turn)>0&&Math.abs(p.turn)<=179));}
 function render(){
  const g=geometry(state),has=state.lengths.length>0,marks=bendMarkLayout(state,getBender(state.benderId)),material=marks.supported&&has?marks.endPosition:g.used,left=state.stock-material;
- $('empty').style.display=has?'none':'flex';$('drawing-reference-details').hidden=!has;$('drawing-title').textContent=state.name;$('bend-fields').hidden=!has;
+ $('empty').style.display=has?'none':'flex';$('drawing-reference-details').hidden=!has;$('drawing-title').textContent=state.name;$('bend-fields').hidden=!has;$('angle').disabled=!has;
  $('editor-title').textContent=has?t('Fortsæt fra ende ')+end:t('Start med første stykke');
  $('editor-help').textContent=has?t('Vælg vinkel og længde. Spejlvend bukket for at vælge den anden side.'):t('Tilføj første længde, og tryk derefter på ende A eller B.');
  $('add').textContent=!state.configured?t('Opret rør'):has?t('Tilføj buk & stykke'):t('Tilføj første stykke');
@@ -153,10 +160,14 @@ function renderBenderMarks(container,project,g){
  if(!report.supported){const error=document.createElement('p');error.className='mark-unavailable';error.textContent=t('Ingen afsætningstabel for denne opsætning.')+' '+(report.error||report.reason);container.append(error);return;}
  const table=document.createElement('table'),head=document.createElement('thead'),header=document.createElement('tr'),body=document.createElement('tbody');table.className='mark-table';
  for(const title of ['Buk','Vinkel','Fradrag fra forrige buk','Fra forrige mærke','Mærke fra A']){const th=document.createElement('th');th.textContent=t(title);header.append(th);}head.append(header);table.append(head,body);
- for(const mark of report.marks){const row=document.createElement('tr');for(const value of [mark.id,fmt(Math.abs(mark.angle))+'°',fmt(mark.gainApplied)+' mm',fmt(mark.interval)+' mm',fmt(mark.position)+' mm']){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}body.append(row);}
- const endRow=document.createElement('tr');for(const value of [t('Rørslut'),'—',report.gains.length?fmt(report.gains.at(-1))+' mm':'—',fmt(report.intervals.at(-1))+' mm',fmt(report.endPosition)+' mm']){const cell=document.createElement('td');cell.textContent=value;endRow.append(cell);}body.append(endRow);
+ const displayed=roundDisplayedMarks(report,{digits:bender.nativeUnits==='in'?3:1});
+ if(!displayed.ok){const error=document.createElement('p');error.className='mark-unavailable';error.textContent=t('Afsætningsmålene kunne ikke afrundes sikkert.');container.append(error);return;}
+ for(const mark of displayed.marks){const row=document.createElement('tr');for(const value of [mark.id,fmt(Math.abs(mark.angle))+'°',fmt(mark.gainApplied)+' mm',fmt(mark.displayedInterval)+' mm',fmt(mark.displayedPosition)+' mm']){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}body.append(row);}
+ const endRow=document.createElement('tr');for(const value of [t('Rørslut'),'—',report.gains.length?fmt(report.gains.at(-1))+' mm':'—',fmt(displayed.displayedEndInterval)+' mm',fmt(displayed.displayedEndPosition)+' mm']){const cell=document.createElement('td');cell.textContent=value;endRow.append(cell);}body.append(endRow);
  const scroll=document.createElement('div');scroll.className='mark-table-wrap';scroll.append(table);container.append(scroll);
  const explanation=document.createElement('p');explanation.className='hint';explanation.textContent=t('Fra forrige mærke viser målet fra sidste mærke; første mål er fra ende A. Mærke fra A viser det samlede mål. Værktøjets fradrag er allerede indregnet.');container.append(explanation);
+ const roundingNote=document.createElement('p');roundingNote.className='hint';roundingNote.textContent=t('Delmålene beregnes fra de afrundede mærker fra A, så de stemmer med kaplængden.');container.append(roundingNote);
+ if(displayed.precisionLimited){const warning=document.createElement('p');warning.className='mark-unavailable';warning.textContent=t('Et delmål er mindre end visningens præcision. Brug de samlede mærker fra A.');container.append(warning);}
  const totals=document.createElement('p');totals.className='mark-totals';totals.textContent=t('Kaplængde efter værktøjstabel')+': '+fmt(report.endPosition)+' mm · '+t('Geometrisk centerlinjelængde')+': '+fmt(g.used)+' mm';container.append(totals);
  const note=document.createElement('p');note.className='hint';note.textContent=t('Værktøjstabellens kaplængde og den ideelle centerlinjelængde er forskellige beregningsmetoder. Brug kaplængden sammen med den valgte bukkers afsætningsmetode.');container.append(note);
  const source=document.createElement('a');source.href=bender.source.url+'#page=23';source.target='_blank';source.rel='noopener noreferrer';source.textContent=t('Producentens tabel og mærkereference')+' · MS-13-43, '+bender.source.revision;container.append(source);
@@ -171,7 +182,38 @@ let py=NaN,off=NaN;function updateTools(){py=triangle($('solve').value,+$('p1').
  $('offset-formula').textContent=Number.isFinite(off)?formatOffset(displacement)+' × '+formatFactor(factor)+' = '+formatOffset(off)+' '+offsetUnit:t('Kontrollér forskydning, vinkel og faktor.');
  renderOffsetVisualization($('offset-svg'),{offset:displacement,angle:bendAngle,length:off,factor,unit:offsetUnit,rotation:offsetRotation,mirror:offsetMirror},t,formatOffset);
  $('offset-mirror').setAttribute('aria-pressed',String(offsetMirror));}$('solve').onchange=()=>{const m=$('solve').value;$('p1-label').firstChild.textContent=(m==='a'?'b':'a')+' · mm';$('p2-label').firstChild.textContent=(m==='c'?'b':'c')+' · mm';updateTools();};for(const k of['p1','p2','offset','offset-factor'])$(k).oninput=updateTools;$('offset-angle').oninput=()=>{const a=Number($('offset-angle').value);if(a>0&&a<=90)$('offset-factor').value=a===45?'1.4':String(Number((1/Math.sin(a*Math.PI/180)).toFixed(3)));updateTools();};let currentOffsetUnit='cm';$('offset-unit').onchange=()=>{const next=$('offset-unit').value;if(next!==currentOffsetUnit){$('offset').value=String(Number($('offset').value)*(next==='mm'?10:.1));currentOffsetUnit=next;}updateTools();};function use(v){$('length').value=Math.round(v*1000)/1000;$('unit').value='1';render();$('length').scrollIntoView({behavior:'smooth',block:'center'});$('length').focus({preventScroll:true});}$('use-pyth').onclick=()=>use(py);
-$('export').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=(state.name.replace(/[^a-zA-Z0-9æøåÆØÅ_-]/g,'_')||'pipe-bend')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};$('import').onclick=()=>$('file').click();$('file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>100000)throw Error();const s=JSON.parse(await f.text());if(!valid(s))throw Error();if(state.lengths.length&&!confirm(t('Erstat det åbne projekt med filen?')))return;commit(normalizeProject(s));}catch{alert(t('Filen er ikke et gyldigt Pipe-bend-projekt.'));}finally{e.target.value='';}};$('print').onclick=()=>{renderWork();window.print();};
+const MAX_PROJECT_FILE_BYTES=2*1024*1024;
+$('export').onclick=()=>{
+ try{
+  const project={...state};delete project.wallDraft;
+  const draft=roomPlanner.exportDraft();if(draft)project.wallDraft=draft;
+  const blob=new Blob([JSON.stringify(project,null,2)],{type:'application/json'});
+  if(blob.size>MAX_PROJECT_FILE_BYTES)throw new RangeError('Project file too large');
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;
+  a.download=(state.name.replace(/[^a-zA-Z0-9æøåÆØÅ_-]/g,'_')||'pipe-bend')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ }catch{alert(t('Projektet kunne ikke gemmes som fil. Kontrollér vægudkastet, og prøv igen.'));}
+};
+$('import').onclick=()=>$('file').click();
+$('file').onchange=async event=>{
+ const file=event.target.files[0];if(!file)return;
+ try{
+  if(file.size>MAX_PROJECT_FILE_BYTES)throw new RangeError('Project file too large');
+  const document=JSON.parse(await file.text());
+  if(!document||typeof document!=='object'||Array.isArray(document))throw new TypeError('Invalid project');
+  const {wallDraft,...rawProject}=document;
+  if(!valid(rawProject))throw new TypeError('Invalid project');
+  const next=normalizeProject(rawProject);if(!valid(next))throw new TypeError('Invalid project');
+  const draft=wallDraft===undefined||wallDraft===null?null:roomPlanner.validateDraft(wallDraft);
+  if(draft?.error){const error=new TypeError('Invalid wall draft');error.wallDraft=true;throw error;}
+  const shape=geometry(next);if(!Number.isFinite(shape.used)||!shape.points.every(point=>point.every(Number.isFinite)))throw new TypeError('Invalid project geometry');
+  let hasDraft=false;try{hasDraft=!!roomPlanner.exportDraft();}catch{hasDraft=true;}
+  if((state.lengths.length||hasDraft)&&!confirm(t('Erstat det åbne projekt med filen?')))return;
+  const wasOpen=roomPlanner.isOpen();try{roomPlanner.setDraft(next,draft);}catch{const error=new Error('Project storage unavailable');error.importWrite=true;throw error;}
+  commit(next,false,true);if(wasOpen)roomPlanner.open();
+ }catch(error){alert(t(error?.wallDraft?'Vægudkastet i filen er ugyldigt. Det åbne projekt er bevaret.':error?.importWrite?'Projektet kunne ikke indlæses. Det åbne projekt er bevaret. Kontrollér browserens lagring, og prøv igen.':'Filen er ikke et gyldigt Pipe-bend-projekt.'));}
+ finally{event.target.value='';}
+};
+$('print').onclick=()=>{renderWork();window.print();};
 let calc=NaN;function calcUpdate(){try{calc=calculate($('expression').value);$('calc-result').textContent=fmt(calc);}catch{calc=NaN;$('calc-result').textContent=$('expression').value?t('Kontrollér regnestykket'):'0';}$('use-calc').disabled=!Number.isFinite(calc)||calc<=0;}for(const k of['7','8','9','÷','4','5','6','×','1','2','3','−','0',',','⌫','+','(',')','C','=']){const b=document.createElement('button');b.textContent=k;b.onclick=()=>{const f=$('expression');if(k==='C')f.value='';else if(k==='⌫')f.value=f.value.slice(0,-1);else if(k!=='=')f.value+=k==='−'?'-':k;calcUpdate();};$('keys').append(b);}$('expression').oninput=calcUpdate;$('calculator-open').onclick=()=>{$('calculator').showModal();calcUpdate();};$('use-calc').onclick=()=>{if(Number.isFinite(calc)&&calc>0){$('calculator').close();use(calc);}};let installPrompt;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;});$('install').onclick=async()=>{if(installPrompt){await installPrompt.prompt();installPrompt=null;}else $('install-help').showModal();};if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{$('error').textContent=t('Offlinefunktionen kræver HTTPS eller localhost.');});initBenderChoices();initAppSharing();captureTranslations();applyLanguage(language);$('language').value=language;sync();render();
 
 function drawTriangle(){
@@ -225,6 +267,7 @@ for(const event of ['pointerup','pointercancel','lostpointercapture'])drawing.ad
 drawing.addEventListener('keydown',e=>{if(e.target!==drawing)return;const step=45/camera.zoom;if(e.key==='+'||e.key==='=')zoomTo(camera.zoom*1.35);else if(e.key==='-')zoomTo(camera.zoom/1.35);else if(e.key==='0')$('zoom-fit').click();else if(e.key==='ArrowLeft')camera.x-=step;else if(e.key==='ArrowRight')camera.x+=step;else if(e.key==='ArrowUp')camera.y-=step;else if(e.key==='ArrowDown')camera.y+=step;else return;e.preventDefault();applyCamera();});
 function renderWork(){
  const g=geometry(state),marks=bendMarkLayout(state,getBender(state.benderId)),material=marks.supported?marks.endPosition:g.used;
+ const wallStatus=wallValidationStatus(state);for(const id of ['work-wall-status','work-wall-status-data']){const node=$(id);node.hidden=wallStatus.status==='none';node.setAttribute('data-wall-status',wallStatus.status);node.classList.toggle('needs-check',wallStatus.status==='needs-check');node.textContent=wallStatus.status==='none'?'':t(wallStatus.messageKey)+(wallStatus.detailKey?' · '+t(wallStatus.detailKey):'');}
  $('work-mode-note').textContent=t(measurementMode(state)==='vertex'?'Færdigmål til centerlinjehjørner':'Lige længder mellem tangentpunkter')+' · R'+fmt(state.radius)+' mm';
  $('work-blank-title').textContent=t(marks.supported?'Udfoldet rør · afsætningsmærker fra A':'Udfoldet rør · geometriske referencepunkter');
  $('work-blank-note').textContent=t(marks.supported?'Afmærkning efter den valgte værktøjstabel. Tabellen nedenfor viser geometriske tangentpunkter.':'Alle afstande er i mm fra ende A langs det rette rør. Retninger læses fra A mod B.');
@@ -268,7 +311,21 @@ function drawBlank(g,marks){
 }
 function openWork(){renderWork();document.body.classList.add('work-mode');$('work-sheet').hidden=false;window.scrollTo(0,0);$('work-close').focus({preventScroll:true});}
 $('work-open').onclick=openWork;$('work-close').onclick=()=>{document.body.classList.remove('work-mode');$('work-sheet').hidden=true;$('work-open').scrollIntoView({block:'center'});$('work-open').focus({preventScroll:true});};$('work-print').onclick=()=>{renderWork();window.print();};window.addEventListener('beforeprint',()=>{renderWork();document.body.classList.add('printing-work');$('work-sheet').hidden=false;});window.addEventListener('afterprint',()=>{document.body.classList.remove('printing-work');if(!document.body.classList.contains('work-mode'))$('work-sheet').hidden=true;});
-$('work-svg').onclick=()=>{const svg=$('work-drawing').cloneNode(true);svg.setAttribute('xmlns','http://www.w3.org/2000/svg');svg.setAttribute('width','1200');const[vx,vy,vw,vh]=svg.getAttribute('viewBox').split(' ').map(Number);svg.setAttribute('height',String((vh+60)*1200/vw));svg.setAttribute('viewBox',`${vx} ${vy-50} ${vw} ${vh+60}`);const title=document.createElementNS('http://www.w3.org/2000/svg','text');title.setAttribute('x',String(vx+30));title.setAttribute('y',String(vy-20));title.setAttribute('font-size','22');title.textContent=t('Tegningsnummer')+' · '+(state.drawingNumber||state.name);svg.append(title);const style=document.createElementNS('http://www.w3.org/2000/svg','style');style.textContent='.measure{font:14px sans-serif;fill:#274b44;paint-order:stroke;stroke:white;stroke-width:5px}.angle-label{font:bold 14px sans-serif;fill:#16815d;paint-order:stroke;stroke:white;stroke-width:5px}';svg.prepend(style);const url=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml'})),a=document.createElement('a');a.href=url;a.download='pipe-bend-drawing.svg';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+$('work-svg').onclick=()=>{
+ renderWork();
+ const wallStatus=wallValidationStatus(state),svg=$('work-drawing').cloneNode(true),ns='http://www.w3.org/2000/svg';svg.setAttribute('xmlns',ns);svg.setAttribute('width','1200');
+ const[vx,vy,vw,vh]=svg.getAttribute('viewBox').split(' ').map(Number),top=wallStatus.status==='none'?50:wallStatus.detailKey?104:84;
+ svg.setAttribute('height',String((vh+top+10)*1200/vw));svg.setAttribute('viewBox',`${vx} ${vy-top} ${vw} ${vh+top+10}`);
+ if(wallStatus.status!=='none'){
+  const group=document.createElementNS(ns,'g'),warning=wallStatus.status==='needs-check',y=vy-top+12;group.setAttribute('data-wall-status',wallStatus.status);group.setAttribute('font-family','sans-serif');
+  const box=document.createElementNS(ns,'rect');for(const[key,value]of Object.entries({x:vx+24,y,width:vw-48,height:wallStatus.detailKey?48:28,rx:4,fill:warning?'#fff4df':'#edf7f1',stroke:warning?'#9b4e19':'#477b64','stroke-width':1}))box.setAttribute(key,String(value));group.append(box);
+  const line=(key,baseline,size,bold=false)=>{const node=document.createElementNS(ns,'text');for(const[name,value]of Object.entries({x:vx+34,y:baseline,'font-size':size,fill:warning?'#783d18':'#245840','font-weight':bold?600:400}))node.setAttribute(name,String(value));node.textContent=t(key);group.append(node);};
+  line(wallStatus.messageKey,y+19,15,true);if(wallStatus.detailKey)line(wallStatus.detailKey,y+37,13);svg.append(group);
+ }
+ const title=document.createElementNS(ns,'text');title.setAttribute('x',String(vx+30));title.setAttribute('y',String(vy-20));title.setAttribute('font-size','22');title.textContent=t('Tegningsnummer')+' · '+(state.drawingNumber||state.name);svg.append(title);
+ const style=document.createElementNS(ns,'style');style.textContent='.measure{font:14px sans-serif;fill:#274b44;paint-order:stroke;stroke:white;stroke-width:5px}.angle-label{font:bold 14px sans-serif;fill:#16815d;paint-order:stroke;stroke:white;stroke-width:5px}';svg.prepend(style);
+ const url=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml'})),a=document.createElement('a');a.href=url;a.download='pipe-bend-drawing.svg';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
 applyCamera();
 
 initTypography(()=>{render();if(document.body.classList.contains("work-mode"))renderWork();});
@@ -312,10 +369,12 @@ $('pipe-settings-form').onsubmit=event=>{
  for(const key of ['name','stock','diameter','wall','radius'])next[key]=key==='name'?$(key).value.trim():Number($(key).value);
  next.drawingNumber=$('drawing-number').value.trim();next.benderId=$('bender-select').value||null;
  const nextMode=$('measurement-mode').value;
- if(pipeSettingsMode==='new'){next.lengths=[];next.turns=[];next.heading=0;next.measurementMode=nextMode;delete next.planner;delete next.placement;}else{try{if(nextMode!==measurementMode(state))next=convertMeasurementMode(next,nextMode);}catch(error){$('pipe-settings-error').textContent=error.message;return;}}
+ if(pipeSettingsMode==='new'){next.projectId=crypto.randomUUID();next.lengths=[];next.turns=[];next.heading=0;next.measurementMode=nextMode;delete next.planner;delete next.placement;}else{try{if(nextMode!==measurementMode(state))next=convertMeasurementMode(next,nextMode);}catch(error){$('pipe-settings-error').textContent=error.message;return;}}
  if(!next.name||!valid(next)){$('pipe-settings-error').textContent=validateMeasurements(next)||t('Angiv et projektnavn og gyldige rørdimensioner. Godstykkelsen skal være under halvdelen af diameteren, og centerlinjeradius skal være større end halvdelen af diameteren.');return;}
- if(pipeSettingsMode==='new'){end='B';sign=1;camera.zoom=1;camera.x=camera.baseX;camera.y=camera.baseY;}
- commit(next);$('pipe-settings').close();$('length').scrollIntoView({block:'center',behavior:'smooth'});$('length').focus({preventScroll:true});
+ const reopenWall=pipeSettingsMode==='new'&&roomPlanner.isOpen();
+ if(pipeSettingsMode==='new'){try{roomPlanner.setDraft(next,null);}catch{$('pipe-settings-error').textContent=t('Projektet kunne ikke oprettes. Det aktuelle projekt er bevaret.');return;}}
+ if(pipeSettingsMode==='new'){end='B';sign=1;$('angle').value='90';$('length').value=$('length').getAttribute('value')||'35';$('unit').value='10';camera.zoom=1;camera.x=camera.baseX;camera.y=camera.baseY;}
+ commit(next);if(reopenWall)roomPlanner.open();$('pipe-settings').close();$('length').scrollIntoView({block:'center',behavior:'smooth'});$('length').focus({preventScroll:true});
 };
 const roomPlanner=initRoomPlanner({getProject:()=>state,language:()=>language,t,onApply:route=>{
  const next={...structuredClone(state),configured:true,measurementMode:'vertex',lengths:route.lengths,turns:route.turns,heading:route.heading,placement:{start:route.start},planner:route.planner};
@@ -323,6 +382,14 @@ const roomPlanner=initRoomPlanner({getProject:()=>state,language:()=>language,t,
  end='B';sign=1;camera.zoom=1;camera.x=camera.baseX;camera.y=camera.baseY;commit(next,true);
  $('drawing').scrollIntoView({block:'center',behavior:'smooth'});
 }});
+// A file opened by an older app may have retained its portable draft in the
+// main JSON. Migrate it without replacing an already newer per-project copy.
+if(bootEmbeddedDraft){try{
+ const draft=roomPlanner.validateDraft(bootEmbeddedDraft);
+ if(draft?.error)throw new TypeError('Invalid embedded wall draft');
+ if(!roomPlanner.exportDraft())roomPlanner.setDraft(state,draft);
+ delete state.wallDraft;save();
+}catch{}}
 for(const id of ['room-open','room-open-menu'])$(id).onclick=()=>roomPlanner.open();
 let drawingObservedWidth=$('drawing').clientWidth;
 if(typeof ResizeObserver==='function')new ResizeObserver(()=>{
