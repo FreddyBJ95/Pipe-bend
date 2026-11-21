@@ -827,6 +827,10 @@ const messages={
     "nb": "Fradrag fra forrige bøy",
     "en": "Previous bend adjustment"
   },
+  "Fra forrige mærke": {
+    "nb": "Fra forrige merke",
+    "en": "From previous mark"
+  },
   "Mærke fra A": {
     "nb": "Merke fra A",
     "en": "Mark from A"
@@ -835,9 +839,9 @@ const messages={
     "nb": "Rørslutt",
     "en": "Tube end"
   },
-  "Mærkerne måles fra ende A og bruges med producentens mærkereference. Fradraget tages én gang for det foregående buk.": {
-    "nb": "Merkene måles fra ende A og brukes med produsentens merkereferanse. Fradraget tas én gang for forrige bøy.",
-    "en": "Marks are measured from end A and used with the manufacturer’s reference marks. Apply each preceding bend adjustment once."
+  "Fra forrige mærke viser målet fra sidste mærke; første mål er fra ende A. Mærke fra A viser det samlede mål. Værktøjets fradrag er allerede indregnet.": {
+    "nb": "Fra forrige merke viser målet fra siste merke; første mål er fra ende A. Merke fra A viser det samlede målet. Verktøyets fradrag er allerede tatt med.",
+    "en": "From previous mark shows the distance from the last mark; the first distance starts at end A. Mark from A is the cumulative distance. The tool adjustment is already included."
   },
   "Kaplængde efter værktøjstabel": {
     "nb": "Kappelengde etter verktøytabell",

@@ -1,6 +1,6 @@
-import {generateWallRoute,validateWallRoute,wallLayout,pointOnWall,wallObstaclePolygon} from './wall-routing.mjs?v=25';
-import {layoutWallLabels,wallSegmentFootprint,wallDirectionArrow} from './wall-label-layout.mjs?v=25';
-import {rectPolygon} from './dimension-layout.mjs?v=25';
+import {generateWallRoute,validateWallRoute,wallLayout,pointOnWall,wallObstaclePolygon} from './wall-routing.mjs?v=26';
+import {layoutWallLabels,wallSegmentFootprint,wallDirectionArrow} from './wall-label-layout.mjs?v=26';
+import {rectPolygon} from './dimension-layout.mjs?v=26';
 
 const words={
   title:['Tegn vægforløb','Tegn veggforløp','Draw the wall path'],

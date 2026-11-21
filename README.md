@@ -6,7 +6,7 @@ Dansk PWA til planlægning af rørbuk. Ingen konto eller eksterne biblioteker.
 2. Indtast første længde, fx 10 cm. Fortsæt fra A eller B med vinkel og næste mål.
 3. Færdigmål går til de tænkte hjørner på rørenes centerlinjer. Lige længder går mellem buernes tangentpunkter. Skift af måltype omregner eksisterende værdier uden at ændre rørets form.
 4. Spejlvend vælger venstre eller højre ud fra den valgte ende. Umuligt korte stykker afvises, også i forhåndsvisningen.
-5. Afsætningsmål viser mærker fra A, fradrag fra det foregående buk og kaplængde efter det valgte værktøjs tabel. Fortryd virker også efter anvendelse af et vægforslag.
+5. Afsætningsmål viser både det samlede mærkemål fra A og målet fra forrige mærke, samt fradrag fra det foregående buk og kaplængde efter det valgte værktøjs tabel. Første mål fra forrige mærke starter ved ende A; sidste række er fra sidste bukkemærke til rørslut. Fradraget er allerede indregnet i disse mål. Kolonnen findes også i arbejdsvisning og udskrift. Fortryd virker også efter anvendelse af et vægforslag.
 
 Den ideelle centerlinjegeometri beregnes med tangentlængder plus cirkelbuer. Afsætningsmærker og kaplængde efter producentens værktøjstabel er en separat, praktisk mærkemetode. Begge værdier vises med tydelige betegnelser; geometriske tangentpunkter kaldes ikke bukkemærker. Materialeoversigten bruger værktøjstabellens kaplængde, når hele opsætningen understøttes, ellers den geometriske længde.
 

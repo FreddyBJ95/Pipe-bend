@@ -1,13 +1,13 @@
-import {initAppSharing} from './share-app.mjs?v=25';
+import {initAppSharing} from './share-app.mjs?v=26';
 import {SWAGELOK_BENDERS,getBender} from './benders.mjs';
 import {measurementMode,validateMeasurements,convertMeasurementMode,bendMarkLayout} from './measurements.mjs';
-import {initRoomPlanner} from './room-planner.mjs?v=25';
+import {initRoomPlanner} from './room-planner.mjs?v=26';
 import {renderOffsetVisualization} from './offset-visual.mjs';
-import {initTypography} from './typography.mjs?v=25';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=25';
-import {layoutBlankMarks} from './blank-layout.mjs?v=25';
-import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=25';
-import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=25';
+import {initTypography} from './typography.mjs?v=26';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=26';
+import {layoutBlankMarks} from './blank-layout.mjs?v=26';
+import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=26';
+import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=26';
 import{geometry,extend,triangle,practicalOffsetLength,calculate}from'./geometry.mjs';
 const $=id=>document.getElementById(id),fmt=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:getBender(state.benderId)?.nativeUnits==='in'?3:1}):'—';
 function newDrawingNumber(){const d=new Date(),date=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('');return 'PB-'+date+'-'+crypto.randomUUID().slice(0,6).toUpperCase();}
@@ -144,11 +144,11 @@ function renderBenderMarks(container,project,g){
  info.textContent=bender.model+' · Ø'+fmt(bender.tubeODmm)+' mm · R'+fmt(bender.radiusMm)+' mm';container.append(info);
  if(!report.supported){const error=document.createElement('p');error.className='mark-unavailable';error.textContent=t('Ingen afsætningstabel for denne opsætning.')+' '+(report.error||report.reason);container.append(error);return;}
  const table=document.createElement('table'),head=document.createElement('thead'),header=document.createElement('tr'),body=document.createElement('tbody');table.className='mark-table';
- for(const title of ['Buk','Vinkel','Fradrag fra forrige buk','Mærke fra A']){const th=document.createElement('th');th.textContent=t(title);header.append(th);}head.append(header);table.append(head,body);
- for(const mark of report.marks){const row=document.createElement('tr');for(const value of [mark.id,fmt(Math.abs(mark.angle))+'°',fmt(mark.gainApplied)+' mm',fmt(mark.position)+' mm']){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}body.append(row);}
- const endRow=document.createElement('tr');for(const value of [t('Rørslut'),'—',report.gains.length?fmt(report.gains.at(-1))+' mm':'—',fmt(report.endPosition)+' mm']){const cell=document.createElement('td');cell.textContent=value;endRow.append(cell);}body.append(endRow);
+ for(const title of ['Buk','Vinkel','Fradrag fra forrige buk','Fra forrige mærke','Mærke fra A']){const th=document.createElement('th');th.textContent=t(title);header.append(th);}head.append(header);table.append(head,body);
+ for(const mark of report.marks){const row=document.createElement('tr');for(const value of [mark.id,fmt(Math.abs(mark.angle))+'°',fmt(mark.gainApplied)+' mm',fmt(mark.interval)+' mm',fmt(mark.position)+' mm']){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}body.append(row);}
+ const endRow=document.createElement('tr');for(const value of [t('Rørslut'),'—',report.gains.length?fmt(report.gains.at(-1))+' mm':'—',fmt(report.intervals.at(-1))+' mm',fmt(report.endPosition)+' mm']){const cell=document.createElement('td');cell.textContent=value;endRow.append(cell);}body.append(endRow);
  const scroll=document.createElement('div');scroll.className='mark-table-wrap';scroll.append(table);container.append(scroll);
- const explanation=document.createElement('p');explanation.className='hint';explanation.textContent=t('Mærkerne måles fra ende A og bruges med producentens mærkereference. Fradraget tages én gang for det foregående buk.');container.append(explanation);
+ const explanation=document.createElement('p');explanation.className='hint';explanation.textContent=t('Fra forrige mærke viser målet fra sidste mærke; første mål er fra ende A. Mærke fra A viser det samlede mål. Værktøjets fradrag er allerede indregnet.');container.append(explanation);
  const totals=document.createElement('p');totals.className='mark-totals';totals.textContent=t('Kaplængde efter værktøjstabel')+': '+fmt(report.endPosition)+' mm · '+t('Geometrisk centerlinjelængde')+': '+fmt(g.used)+' mm';container.append(totals);
  const note=document.createElement('p');note.className='hint';note.textContent=t('Værktøjstabellens kaplængde og den ideelle centerlinjelængde er forskellige beregningsmetoder. Brug kaplængden sammen med den valgte bukkers afsætningsmetode.');container.append(note);
  const source=document.createElement('a');source.href=bender.source.url+'#page=23';source.target='_blank';source.rel='noopener noreferrer';source.textContent=t('Producentens tabel og mærkereference')+' · MS-13-43, '+bender.source.revision;container.append(source);
