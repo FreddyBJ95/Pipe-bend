@@ -1,22 +1,22 @@
-import {initAppSharing} from './share-app.mjs?v=32';
+import {initAppSharing} from './share-app.mjs?v=33';
 import {SWAGELOK_BENDERS,getBender} from './benders.mjs';
 import {measurementMode,validateMeasurements,convertMeasurementMode,bendMarkLayout} from './measurements.mjs';
-import {roundDisplayedMarks} from './displayed-marks.mjs?v=32';
-import {isProjectId} from './project-storage.mjs?v=32';
-import {initRoomPlanner} from './room-planner.mjs?v=32';
+import {roundDisplayedMarks} from './displayed-marks.mjs?v=33';
+import {isProjectId} from './project-storage.mjs?v=33';
+import {initRoomPlanner} from './room-planner.mjs?v=33';
 import {renderOffsetVisualization} from './offset-visual.mjs';
-import {initTypography} from './typography.mjs?v=32';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=32';
-import {layoutBlankMarks} from './blank-layout.mjs?v=32';
-import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=32';
-import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=32';
+import {initTypography} from './typography.mjs?v=33';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=33';
+import {layoutBlankMarks} from './blank-layout.mjs?v=33';
+import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=33';
+import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=33';
 import{geometry,extend,triangle,practicalOffsetLength,calculate}from'./geometry.mjs';
-import {wallValidationStatus} from './wall-validation-status.mjs?v=32';
+import {wallValidationStatus} from './wall-validation-status.mjs?v=33';
+import {createMainPipeDrawing} from './main-pipe-drawing.mjs?v=33';
 const $=id=>document.getElementById(id),fmt=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:getBender(state.benderId)?.nativeUnits==='in'?3:1}):'—';
 function newDrawingNumber(){const d=new Date(),date=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('');return 'PB-'+date+'-'+crypto.randomUUID().slice(0,6).toUpperCase();}
 function normalizeProject(s){const name=s.name.trim()||t('Mit første rør');return {...s,projectId:isProjectId(s.projectId)?s.projectId:crypto.randomUUID(),name,configured:s.configured!==false,drawingNumber:s.drawingNumber?.trim()||name};}
 let triangleRotation=0,triangleMirror=false,editing=null,offsetRotation=0,offsetMirror=false,pipeSettingsMode='new';
-const camera={zoom:1,x:450,y:270,width:900,height:540,baseX:450,baseY:270};
 let state={version:1,projectId:crypto.randomUUID(),configured:false,name:t('Mit første rør'),drawingNumber:newDrawingNumber(),stock:6000,diameter:12,wall:1.5,radius:38,benderId:'swagelok-ms-htb-12m',measurementMode:'vertex',heading:0,lengths:[],turns:[]},end='B',sign=1,history=[],storageOK=true;
 function valid(s){return s&&s.version===1&&typeof s.name==='string'&&s.name.length<=80&&(s.projectId===undefined||isProjectId(s.projectId))&&(s.drawingNumber===undefined||(typeof s.drawingNumber==='string'&&s.drawingNumber.trim().length>0&&s.drawingNumber.length<=80))&&['stock','diameter','wall','radius','heading'].every(k=>typeof s[k]==='number'&&Number.isFinite(s[k]))&&s.stock>0&&s.diameter>0&&s.wall>0&&s.wall<s.diameter/2&&s.radius>s.diameter/2&&Array.isArray(s.lengths)&&s.lengths.length<=200&&s.lengths.every(v=>Number.isFinite(v)&&v>0)&&Array.isArray(s.turns)&&s.turns.length===Math.max(0,s.lengths.length-1)&&s.turns.every(v=>Number.isFinite(v)&&Math.abs(v)>0&&Math.abs(v)<=179)&&(s.measurementMode===undefined||['tangent','vertex'].includes(s.measurementMode))&&(s.benderId===undefined||s.benderId===null||typeof s.benderId==='string')&&!validateMeasurements(s);}
 let bootEmbeddedDraft=null;
@@ -44,11 +44,14 @@ function render(){
  renderBenderMarks($('live-marks'),state,g);draw(g,preview);updateTools();
 }
 
+const mainPipeDrawing=createMainPipeDrawing({svg:$('drawing'),zoomIn:$('zoom-in'),zoomOut:$('zoom-out'),fit:$('zoom-fit'),output:$('zoom-level'),format:n=>fmt(n),translate:t,onEdit:openEdit,onEndpoint:label=>{end=label;render();$('angle').scrollIntoView({behavior:'smooth',block:'center'});$('angle').focus({preventScroll:true});}});
+
 function draw(g,preview,target=$('drawing'),work=false){
+ if(!work){mainPipeDrawing.draw(g,preview,{diameter:state.diameter,radius:state.radius,end});if($('drawing-references'))renderReferences(g,$('drawing-references'));return;}
  const svg=target;svg.replaceChildren();
  const width=work?900:Math.max(280,svg.clientWidth||900),pageHeight=work?1200:Math.max(430,Math.min(540,width*.65));
  if(!work)svg.setAttribute('height',String(pageHeight));
- const setBounds=()=>{if(work){svg.setAttribute('viewBox',`0 0 ${width} ${pageHeight}`);return;}const cx=width/2,cy=pageHeight/2;camera.x+=cx-camera.baseX;camera.y+=cy-camera.baseY;Object.assign(camera,{width,height:pageHeight,baseX:cx,baseY:cy});applyCamera();};
+ const setBounds=()=>svg.setAttribute('viewBox',`0 0 ${width} ${pageHeight}`);
  if(!g.lines.length){setBounds();if(!work&&$('drawing-references'))renderReferences(g,$('drawing-references'));return;}
  const plotWidth=width-(work?150:112),plotHeight=pageHeight-(work?150:112),angle=bestDrawingAngle(g.points,plotWidth,plotHeight),c=Math.cos(angle),sn=Math.sin(angle),rotate=p=>[p[0]*c-p[1]*sn,p[0]*sn+p[1]*c],rotated=g.points.map(rotate),xs=rotated.map(p=>p[0]),ys=rotated.map(p=>p[1]),minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys),scale=Math.min(plotWidth/Math.max(1,maxx-minx),plotHeight/Math.max(1,maxy-miny));
  const P=p=>{const q=rotate(p);return[width/2+(q[0]-(minx+maxx)/2)*scale,pageHeight/2-(q[1]-(miny+maxy)/2)*scale];};
@@ -256,15 +259,7 @@ function openEdit(type,index){editing={type,index};const angle=type==='angle';$(
 $('edit-cancel').onclick=()=>$('edit-dialog').close();
 $('edit-form').onsubmit=e=>{e.preventDefault();if(!editing)return;const n=structuredClone(state),value=Number($('edit-value').value);if(editing.type==='length')n.lengths[editing.index]=value;else n.turns[editing.index]=value*Number($('edit-direction').value);if(!valid(n)){$('edit-error').textContent=validateMeasurements(n)||t('Indtast en gyldig længde eller vinkel.');return;}if(n.planner)n.planner={...n.planner,routeEdited:true};commit(n);$('edit-dialog').close();editing=null;};
 
-function applyCamera(){const w=camera.width/camera.zoom,h=camera.height/camera.zoom;$('drawing').setAttribute('viewBox',`${camera.x-w/2} ${camera.y-h/2} ${w} ${h}`);$('zoom-level').textContent=Math.round(camera.zoom*100)+'%';$('zoom-in').disabled=camera.zoom>=8;$('zoom-out').disabled=camera.zoom<=1;}
-function zoomTo(next,anchor){const old=camera.zoom;camera.zoom=Math.min(8,Math.max(1,next));if(anchor){const ratio=old/camera.zoom;camera.x=anchor.x+(camera.x-anchor.x)*ratio;camera.y=anchor.y+(camera.y-anchor.y)*ratio;}if(camera.zoom===1){camera.x=camera.baseX;camera.y=camera.baseY;}applyCamera();}
-$('zoom-in').onclick=()=>zoomTo(camera.zoom*1.35);$('zoom-out').onclick=()=>zoomTo(camera.zoom/1.35);$('zoom-fit').onclick=()=>{camera.x=camera.baseX;camera.y=camera.baseY;zoomTo(1);};
-const drawing=$('drawing'),pointers=new Map();let gesture=null,dragging=false;
-drawing.addEventListener('wheel',e=>{e.preventDefault();const point=new DOMPoint(e.clientX,e.clientY).matrixTransform(drawing.getScreenCTM().inverse());zoomTo(camera.zoom*Math.exp(-e.deltaY*.002),point);},{passive:false});
-drawing.addEventListener('pointerdown',e=>{if(e.target.closest('[role="button"]'))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});drawing.setPointerCapture(e.pointerId);if(pointers.size===2){const [a,b]=[...pointers.values()];gesture={distance:Math.hypot(a.x-b.x,a.y-b.y),zoom:camera.zoom};}dragging=false;});
-drawing.addEventListener('pointermove',e=>{const old=pointers.get(e.pointerId);if(!old)return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2&&gesture){const[a,b]=[...pointers.values()];zoomTo(gesture.zoom*Math.hypot(a.x-b.x,a.y-b.y)/Math.max(1,gesture.distance));}else if(pointers.size===1){const m=drawing.getScreenCTM();camera.x-=(e.clientX-old.x)/m.a;camera.y-=(e.clientY-old.y)/m.d;applyCamera();}dragging=true;});
-for(const event of ['pointerup','pointercancel','lostpointercapture'])drawing.addEventListener(event,e=>{pointers.delete(e.pointerId);gesture=null;});
-drawing.addEventListener('keydown',e=>{if(e.target!==drawing)return;const step=45/camera.zoom;if(e.key==='+'||e.key==='=')zoomTo(camera.zoom*1.35);else if(e.key==='-')zoomTo(camera.zoom/1.35);else if(e.key==='0')$('zoom-fit').click();else if(e.key==='ArrowLeft')camera.x-=step;else if(e.key==='ArrowRight')camera.x+=step;else if(e.key==='ArrowUp')camera.y-=step;else if(e.key==='ArrowDown')camera.y+=step;else return;e.preventDefault();applyCamera();});
+const drawing=$('drawing');
 function renderWork(){
  const g=geometry(state),marks=bendMarkLayout(state,getBender(state.benderId)),material=marks.supported?marks.endPosition:g.used;
  const wallStatus=wallValidationStatus(state);for(const id of ['work-wall-status','work-wall-status-data']){const node=$(id);node.hidden=wallStatus.status==='none';node.setAttribute('data-wall-status',wallStatus.status);node.classList.toggle('needs-check',wallStatus.status==='needs-check');node.textContent=wallStatus.status==='none'?'':t(wallStatus.messageKey)+(wallStatus.detailKey?' · '+t(wallStatus.detailKey):'');}
@@ -326,7 +321,6 @@ $('work-svg').onclick=()=>{
  const style=document.createElementNS(ns,'style');style.textContent='.measure{font:14px sans-serif;fill:#274b44;paint-order:stroke;stroke:white;stroke-width:5px}.angle-label{font:bold 14px sans-serif;fill:#16815d;paint-order:stroke;stroke:white;stroke-width:5px}';svg.prepend(style);
  const url=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml'})),a=document.createElement('a');a.href=url;a.download='pipe-bend-drawing.svg';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
-applyCamera();
 
 initTypography(()=>{render();if(document.body.classList.contains("work-mode"))renderWork();});
 
@@ -373,13 +367,13 @@ $('pipe-settings-form').onsubmit=event=>{
  if(!next.name||!valid(next)){$('pipe-settings-error').textContent=validateMeasurements(next)||t('Angiv et projektnavn og gyldige rørdimensioner. Godstykkelsen skal være under halvdelen af diameteren, og centerlinjeradius skal være større end halvdelen af diameteren.');return;}
  const reopenWall=pipeSettingsMode==='new'&&roomPlanner.isOpen();
  if(pipeSettingsMode==='new'){try{roomPlanner.setDraft(next,null);}catch{$('pipe-settings-error').textContent=t('Projektet kunne ikke oprettes. Det aktuelle projekt er bevaret.');return;}}
- if(pipeSettingsMode==='new'){end='B';sign=1;$('angle').value='90';$('length').value=$('length').getAttribute('value')||'35';$('unit').value='10';camera.zoom=1;camera.x=camera.baseX;camera.y=camera.baseY;}
+ if(pipeSettingsMode==='new'){end='B';sign=1;$('angle').value='90';$('length').value=$('length').getAttribute('value')||'35';$('unit').value='10';mainPipeDrawing.reset();}
  commit(next);if(reopenWall)roomPlanner.open();$('pipe-settings').close();$('length').scrollIntoView({block:'center',behavior:'smooth'});$('length').focus({preventScroll:true});
 };
 const roomPlanner=initRoomPlanner({getProject:()=>state,language:()=>language,t,onApply:route=>{
  const next={...structuredClone(state),configured:true,measurementMode:'vertex',lengths:route.lengths,turns:route.turns,heading:route.heading,placement:{start:route.start},planner:route.planner};
  if(!valid(next))throw new RangeError(validateMeasurements(next)||t('Rørforslaget har ugyldige mål.'));
- end='B';sign=1;camera.zoom=1;camera.x=camera.baseX;camera.y=camera.baseY;commit(next,true);
+ end='B';sign=1;mainPipeDrawing.reset();commit(next,true);
  $('drawing').scrollIntoView({block:'center',behavior:'smooth'});
 }});
 // A file opened by an older app may have retained its portable draft in the

@@ -2,8 +2,8 @@
 // last saved point list. The explicit edited flag requires a new planner Apply.
 import {geometry} from './geometry.mjs';
 import {measurementMode,convertMeasurementMode} from './measurements.mjs';
-import {migrateRoomPlanner} from './room-planner.mjs?v=32';
-import {validateWallRoute} from './wall-routing.mjs?v=32';
+import {migrateRoomPlanner} from './room-planner.mjs?v=33';
+import {validateWallRoute} from './wall-routing.mjs?v=33';
 
 const finitePoint=point=>Array.isArray(point)&&point.length===2&&point.every(Number.isFinite);
 const messages={
