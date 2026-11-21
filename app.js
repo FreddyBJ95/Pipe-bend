@@ -1,18 +1,18 @@
-import {initAppSharing} from './share-app.mjs?v=33';
+import {initAppSharing} from './share-app.mjs?v=34';
 import {SWAGELOK_BENDERS,getBender} from './benders.mjs';
 import {measurementMode,validateMeasurements,convertMeasurementMode,bendMarkLayout} from './measurements.mjs';
-import {roundDisplayedMarks} from './displayed-marks.mjs?v=33';
-import {isProjectId} from './project-storage.mjs?v=33';
-import {initRoomPlanner} from './room-planner.mjs?v=33';
+import {roundDisplayedMarks} from './displayed-marks.mjs?v=34';
+import {isProjectId} from './project-storage.mjs?v=34';
+import {initRoomPlanner} from './room-planner.mjs?v=34';
 import {renderOffsetVisualization} from './offset-visual.mjs';
-import {initTypography} from './typography.mjs?v=33';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=33';
-import {layoutBlankMarks} from './blank-layout.mjs?v=33';
-import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=33';
-import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=33';
+import {initTypography} from './typography.mjs?v=34';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=34';
+import {layoutBlankMarks} from './blank-layout.mjs?v=34';
+import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=34';
+import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=34';
 import{geometry,extend,triangle,practicalOffsetLength,calculate}from'./geometry.mjs';
-import {wallValidationStatus} from './wall-validation-status.mjs?v=33';
-import {createMainPipeDrawing} from './main-pipe-drawing.mjs?v=33';
+import {wallValidationStatus} from './wall-validation-status.mjs?v=34';
+import {createMainPipeDrawing} from './main-pipe-drawing.mjs?v=34';
 const $=id=>document.getElementById(id),fmt=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:getBender(state.benderId)?.nativeUnits==='in'?3:1}):'—';
 function newDrawingNumber(){const d=new Date(),date=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('');return 'PB-'+date+'-'+crypto.randomUUID().slice(0,6).toUpperCase();}
 function normalizeProject(s){const name=s.name.trim()||t('Mit første rør');return {...s,projectId:isProjectId(s.projectId)?s.projectId:crypto.randomUUID(),name,configured:s.configured!==false,drawingNumber:s.drawingNumber?.trim()||name};}

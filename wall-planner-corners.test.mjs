@@ -30,11 +30,11 @@ for(const [side,turn]of [['left',90],['right',-90]]) {
 }
 
 // The screenshot route includes a wall protrusion and a separate top-wall
-// obstacle. Permitting 90° should simplify the two ordinary room corners,
-// while preserving separate bends on the obstacle detours.
+// obstacle. When radius and clearance permit it, the chosen 90° angle
+// applies to both the ordinary corners and the obstacle detours.
 const screenshot={...corner,wall:{lengths:[1000,1000,120,120,120,1200,1800],turns:[90,90,-90,-90,90,90],heading:0,side:'left'},end:{segment:6,position:1600},obstacles:[{id:'top-obstacle',segment:6,position:900,width:200,depth:200}]};
 const with90=checked(screenshot),with45=checked({...screenshot,maxAngle:45});
-assert.equal(with90.turns.filter(n=>Math.abs(n)===90).length,2);
+assert.ok(with90.turns.every(n=>Math.abs(n)===90),'Both measured protrusions and inserted obstacles use the selected 90° when feasible');
 assert.equal(with45.turns.filter(n=>Math.abs(n)===90).length,0);
 assert.equal(with90.turns.length,10);
 assert.equal(with45.turns.length,12);

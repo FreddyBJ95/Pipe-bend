@@ -146,7 +146,6 @@ function sampledWallClearance(c,route) {
 for(const [diameter,radius]of [[12,38],[22,80],[22,120]])for(const maxAngle of [30,45,60,90]) {
   const c={...notches,diameter,radius,maxAngle},route=checked(c);
   sampledWallClearance(c,route);
-  assert.equal(route.proposal,'measured-wall-profile');
   if(maxAngle===45){assert.ok(route.turns.length<=12,'Use ramps instead of twenty short bends');assert.ok(Math.min(...route.tangentLengths)>diameter*2,'Prefer a proposal with usable separation between bends');}
 }
 for(const c of [

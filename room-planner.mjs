@@ -1,13 +1,13 @@
-import {generateWallRoute,validateWallRoute,wallLayout,pointOnWall,wallObstaclePolygon} from './wall-routing.mjs?v=33';
-import {layoutLocalWallLabels,wallSegmentFootprint,wallDirectionArrow} from './wall-label-layout.mjs?v=33';
-import {rectPolygon} from './dimension-layout.mjs?v=33';
-import {pipeModelFromPoints} from './wall-pipe-edit.mjs?v=33';
-import {solveWallPipeEdit} from './wall-pipe-solver.mjs?v=33';
-import {buildRouteGeometry} from './room-routing.mjs?v=33';
-import {createWallViewport} from './wall-viewport.mjs?v=33';
-import {geometryToSvgPath,getWallClearanceDimensions} from './wall-detail-geometry.mjs?v=33';
-import {pickPipePart,pickWallSegment} from './wall-picking.mjs?v=33';
-import {projectIdentity,projectOpenKey,readWallDraft,writeWallDraft,clearWallDraft} from './project-storage.mjs?v=33';
+import {generateWallRoute,validateWallRoute,wallLayout,pointOnWall,wallObstaclePolygon} from './wall-routing.mjs?v=34';
+import {layoutLocalWallLabels,wallSegmentFootprint,wallDirectionArrow} from './wall-label-layout.mjs?v=34';
+import {rectPolygon} from './dimension-layout.mjs?v=34';
+import {pipeModelFromPoints} from './wall-pipe-edit.mjs?v=34';
+import {solveWallPipeEdit} from './wall-pipe-solver.mjs?v=34';
+import {buildRouteGeometry} from './room-routing.mjs?v=34';
+import {createWallViewport} from './wall-viewport.mjs?v=34';
+import {geometryToSvgPath,getWallClearanceDimensions} from './wall-detail-geometry.mjs?v=34';
+import {pickPipePart,pickWallSegment} from './wall-picking.mjs?v=34';
+import {projectIdentity,projectOpenKey,readWallDraft,writeWallDraft,clearWallDraft} from './project-storage.mjs?v=34';
 
 const words={
   title:['Tegn vægforløb','Tegn veggforløp','Draw the wall path'],
@@ -28,8 +28,10 @@ const words={
   toolHint:['Diameter og radius følger rørindstillingerne.','Diameter og radius følger rørinnstillingene.','Diameter and radius come from pipe settings.'],
   gap:['Fri afstand: væg → rørets yderside','Fri avstand: vegg → rørets utside','Clear distance: wall → outside of pipe'],
   clearance:['Fri afstand til forhindringer','Fri avstand til hindringer','Clearance from obstacles'],maxAngle:['Største vinkel pr. buk','Største vinkel per bøy','Maximum angle per bend'],
-  angleSplitHint:['Højst {angle}° pr. buk betyder mindst {count} buk i et 90°-hjørne. Tillad 90°-buk, hvis hjørnet skal kunne laves med ét buk. Radius og plads kontrolleres stadig.','Maks {angle}° per bøy betyr minst {count} bøyer i et 90°-hjørne. Tillat 90°-bøy hvis hjørnet skal kunne lages med én bøy. Radius og plass kontrolleres fortsatt.','A {angle}° limit means at least {count} bends at a 90° corner. Allow 90° bends to permit a single bend. Radius and available space are still checked.'],
-  angleSingleHint:['Et 90°-hjørne kan laves med ét 90°-buk, når radius og plads tillader det. Omveje ved forhindringer kan stadig bruge flere mindre buk.','Et 90°-hjørne kan lages med én 90°-bøy når radius og plass tillater det. Omveier ved hindringer kan fortsatt bruke flere mindre bøyer.','A 90° corner can use one 90° bend when the radius and available space permit it. Detours around obstacles may still use several smaller bends.'],
+  angleSplitHint:['Ved forhindringer prøves {angle}° først. Højst {angle}° pr. buk betyder mindst {count} buk i et 90°-hjørne. Tillad 90°-buk, hvis hjørnet skal kunne laves med ét buk. Radius og plads kontrolleres stadig.','Ved hindringer prøves {angle}° først. Maks {angle}° per bøy betyr minst {count} bøyer i et 90°-hjørne. Tillat 90°-bøy hvis hjørnet skal kunne lages med én bøy. Radius og plass kontrolleres fortsatt.','For obstacles, {angle}° is tried first. A {angle}° limit means at least {count} bends at a 90° corner. Allow 90° bends to permit a single bend. Radius and available space are still checked.'],
+  angleSingleHint:['Ved forhindringer prøves 90° først. Et 90°-hjørne kan laves med ét 90°-buk, når radius og plads tillader det. Omveje ved forhindringer kan stadig bruge flere mindre buk.','Ved hindringer prøves 90° først. Et 90°-hjørne kan lages med én 90°-bøy når radius og plass tillater det. Omveier ved hindringer kan fortsatt bruke flere mindre bøyer.','For obstacles, 90° is tried first. A 90° corner can use one 90° bend when the radius and available space permit it. Detours around obstacles may still use several smaller bends.'],
+  angleAlternatives:['Søgningen kan prøve mindre vinkler ({angles}); den konkrete vinkel vises ved tegningen.','Søket kan prøve mindre vinkler ({angles}); den faktiske vinkelen vises ved tegningen.','The search may try smaller angles ({angles}); the actual angle is shown beside the drawing.'],
+  detourFallback:['Den valgte vinkel på {requested}° kunne ikke bruges ved alle forhindringer i det fundne forslag. Der bruges også buk på {used}°.','Den valgte vinkelen på {requested}° kunne ikke brukes ved alle hindringer i forslaget som ble funnet. Det brukes også bøyer på {used}°.','The selected {requested}° angle could not be used at every obstacle in the proposal found. The proposal also uses {used}° bends.'],
   allow90:['Tillad 90°-buk og lav nyt forslag','Tillat 90°-bøy og lag nytt forslag','Allow 90° bends and recalculate'],
   start:['Start A','Start A','Start A'],end:['Slut B','Slutt B','End B'],position:['Fra vægstykkets start · mm','Fra veggstykkets start · mm','From segment start · mm'],
   positionsHint:['Placeringer måles fra starten af det valgte vægstykke, i pilens retning.','Plasseringer måles fra starten av valgt veggstykke, i pilens retning.','Measure positions from the start of the selected wall segment, in the arrow direction.'],
@@ -108,9 +110,13 @@ export function normalizeWallDraft(planner) {
     next.pipeEditPending={type:pending.type,index:pending.index,raw:pending.raw,direction:pending.direction===-1?-1:1,code:pending.code||'EDIT_NO_SOLUTION',error:pending.error||'Rettelsen kunne ikke tilpasses. Røret er ikke ændret.'};
   }
   if(next.pipeAdjustments!==undefined&&(!Array.isArray(next.pipeAdjustments)||next.pipeAdjustments.length>400||!next.pipeAdjustments.every(change=>record(change)&&['length','turn'].includes(change.type)&&Number.isInteger(change.index)&&change.index>=0&&change.index<(change.type==='length'?next.points.length-1:next.points.length-2)&&finite(change.from)&&finite(change.to))))return invalid();
+  if(next.pipeDetourNotice!==undefined&&next.pipeDetourNotice!==null){const notice=next.pipeDetourNotice;if(!validDetourPair(notice,input))return invalid();next.pipeDetourNotice={requested:notice.requested,used:notice.used};if(next.pipeEdited||next.routeEdited||next.pipeEditPending||next.points.length<2)delete next.pipeDetourNotice;}else delete next.pipeDetourNotice;
   if(planner.points.length===0)next.savedError=false;
   return next;
 }
+
+function validDetourPair(notice,data){return notice!==null&&typeof notice==='object'&&!Array.isArray(notice)&&typeof notice.requested==='number'&&Number.isFinite(notice.requested)&&typeof notice.used==='number'&&Number.isFinite(notice.used)&&notice.used>0&&notice.used<notice.requested&&notice.requested<=90&&typeof data?.maxAngle==='number'&&Number.isFinite(data.maxAngle)&&data.maxAngle>0&&Math.abs(notice.requested-Math.min(90,data.maxAngle))<=1e-7;}
+function sameDetourContext(a,b){if(typeof a==='number'||typeof b==='number')return typeof a==='number'&&typeof b==='number'&&Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=1e-7;if(a===b)return true;if(!a||!b||typeof a!=='object'||typeof b!=='object'||Array.isArray(a)!==Array.isArray(b))return false;const keys=Object.keys(a),other=Object.keys(b);return keys.length===other.length&&keys.every(key=>Object.hasOwn(b,key)&&sameDetourContext(a[key],b[key]));}
 
 const routeErrors={
   INVALID_WALL:['Kontroller veggstykkene, lengdene og vinklene. Bruk positive lengder og svinger mindre enn 180°.','Check wall segments, lengths and turns. Use positive lengths and turns below 180°.'],
@@ -172,14 +178,14 @@ export function defaultWallPlanInput() {
 export function wallBendAngleHint(maxAngle,language='da') {
   if(!Number.isFinite(maxAngle)||maxAngle<=0)return '';
   const languageIndex={da:0,nb:1,en:2}[language]??0,key=maxAngle<90?'angleSplitHint':'angleSingleHint';
-  return words[key][languageIndex].replace('{angle}',String(maxAngle)).replace('{count}',String(Math.ceil(90/maxAngle)));
+  const base=words[key][languageIndex].replaceAll('{angle}',String(maxAngle)).replace('{count}',String(Math.ceil(90/maxAngle))),smaller=[60,45,30].filter(angle=>angle<Math.min(90,maxAngle));return base+(smaller.length?' '+words.angleAlternatives[languageIndex].replace('{angles}',smaller.map(angle=>angle+'°').join(', ')):'');
 }
 
 /** The host commits a checked pipe; this workspace owns the measured wall draft. */
 export function initRoomPlanner({getProject,onApply,language}) {
   let wall={lengths:[],turns:[],heading:0,side:'left'},draftPoints=[],result=null,returnFocus=null,seq=1,activeWall=-1,activePosition=null,opened=false,projectKey='',migrated=false;
   let selectMode='wall',selectedPipe=null,pipeUndo=[],lastSafe=null,numericPipeInvalid=false,manualPipe=false,pendingPipeEdit=null,autoAdjustments=[];
-  let detailFrame=null,cameraState=null,activeSettingsTab='walls',selectedPlacement=null;
+  let detailFrame=null,cameraState=null,activeSettingsTab='walls',selectedPlacement=null,detourNoticeContext=null;
   const dialog=document.createElement('main');dialog.id='room-planner';dialog.className='room-planner';dialog.hidden=true;dialog.open=false;dialog.setAttribute('aria-labelledby','rp-title');
   const pipeView=document.querySelector('body > main');if(pipeView&&!pipeView.id)pipeView.id='pipe-view';
   let previousHash='',pushedView=false,pipeViewHidden=false,returnScroll=0;
@@ -192,7 +198,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
   const fieldValue=field=>field.value===field.dataset.shownValue?Number(field.dataset.originalValue):Number(field.value);
   const value=id=>fieldValue(q(id));
   const fingerprint=()=>projectOpenKey(getProject());
-  function draftSnapshot(){return{version:2,input:input(),points:clone(draftPoints),pipeEdited:manualPipe,pipeEditPending:pendingPipeEdit?clone(pendingPipeEdit):null,pipeAdjustments:clone(autoAdjustments)};}
+  function draftSnapshot(){const notice=detourNoticePair();return{version:2,input:input(),points:clone(draftPoints),pipeEdited:manualPipe,pipeEditPending:pendingPipeEdit?clone(pendingPipeEdit):null,pipeAdjustments:clone(autoAdjustments),...(notice?{pipeDetourNotice:notice}:{})};}
   function persistDraft(){try{writeWallDraft(getProject(),draftSnapshot(),localStorage,normalizeWallDraft);}catch{}}
   function storedDraft(){try{return readWallDraft(getProject(),localStorage,normalizeWallDraft);}catch{return {error:tr('invalidSaved')};}}
   function exportDraft(){
@@ -241,7 +247,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
   clipSection.append(clipAction,el('div',{id:'rp-clips',class:'rp-list'}));obstacleSection.append(obstacleAction,el('div',{id:'rp-obstacles',class:'rp-list'}));
   settingsPanels.placement.append(button('generate',generate,{id:'rp-generate',class:'primary'}));
   const drawingTop=el('div',{class:'drawing-top'});drawingTop.append(translated('h2','preview'));const modes=el('div',{class:'rp-selection-modes',role:'group'});modes.append(button('selectWallMode',()=>setSelectMode('wall'),{id:'rp-select-wall','aria-pressed':'true'}),button('selectPipe',()=>setSelectMode('pipe'),{id:'rp-select-pipe','aria-pressed':'false',disabled:''}));drawingTop.append(modes);visual.append(drawingTop);
-  const toolbar=el('div',{class:'drawing-toolbar'}),zoomControls=el('div',{class:'zoom-controls'}),zoomOut=button('zoomOut',()=>{}, {id:'rp-zoom-out','aria-label':tr('zoomOut')}),zoomIn=button('zoomIn',()=>{}, {id:'rp-zoom-in','aria-label':tr('zoomIn')}),zoomFit=button('zoomFit',()=>{}, {id:'rp-zoom-fit','aria-label':tr('zoomFit')}),zoomOutput=el('output',{id:'rp-zoom-level','aria-live':'polite'},'100%');zoomOut.removeAttribute('data-rp-text');zoomIn.removeAttribute('data-rp-text');zoomOut.textContent='−';zoomIn.textContent='+';zoomControls.append(zoomOut,zoomOutput,zoomIn,zoomFit);toolbar.append(zoomControls);visual.append(toolbar,translated('p','panHint',{class:'pan-hint'}));
+  const toolbar=el('div',{class:'drawing-toolbar'}),zoomControls=el('div',{class:'zoom-controls'}),zoomOut=button('zoomOut',()=>{}, {id:'rp-zoom-out','aria-label':tr('zoomOut')}),zoomIn=button('zoomIn',()=>{}, {id:'rp-zoom-in','aria-label':tr('zoomIn')}),zoomFit=button('zoomFit',()=>{}, {id:'rp-zoom-fit','aria-label':tr('zoomFit')}),zoomOutput=el('output',{id:'rp-zoom-level','aria-live':'polite'},'100%');zoomOut.removeAttribute('data-rp-text');zoomIn.removeAttribute('data-rp-text');zoomOut.textContent='−';zoomIn.textContent='+';zoomControls.append(zoomOut,zoomOutput,zoomIn,zoomFit);toolbar.append(zoomControls);visual.append(toolbar,translated('p','panHint',{class:'pan-hint'}),el('p',{id:'rp-angle-notice',class:'rp-angle-notice',role:'status','aria-live':'polite',hidden:''}));
   const canvas=el('div',{class:'canvas-wrap'}),svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.id='rp-svg';svg.setAttribute('role','group');svg.setAttribute('tabindex','0');canvas.append(svg);visual.append(canvas);
   const viewport=createWallViewport({svg,zoomIn,zoomOut,fit:zoomFit,output:zoomOutput});
   viewport.setOnChange(state=>{cameraState=state;updateDetailAnnotations(state);});
@@ -267,7 +273,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
     const target=event.target;if(target.closest('#rp-wall-builder'))return;
     if(target.closest('#rp-pipe-fields')){editPipeField(target);return;}
     if(target.id==='rp-pipe-part')return;
-    if(target.closest('#rp-points')){if(![...q('rp-points').querySelectorAll('input')].every(fieldOK)){numericPipeInvalid=true;result=null;q('rp-apply').disabled=true;showError(tr('invalid'));pipeFeedback(false,tr('invalid'));draw();return;}rememberPipe();pendingPipeEdit=null;autoAdjustments=[];readPoints();numericPipeInvalid=false;manualPipe=true;selectMode='pipe';renderPipeFields();checkDraft();return;}
+    if(target.closest('#rp-points')){if(![...q('rp-points').querySelectorAll('input')].every(fieldOK)){clearDetourNotice();manualPipe=true;numericPipeInvalid=true;result=null;q('rp-apply').disabled=true;showError(tr('invalid'));pipeFeedback(false,tr('invalid'));draw();return;}rememberPipe();clearDetourNotice();pendingPipeEdit=null;autoAdjustments=[];readPoints();numericPipeInvalid=false;manualPipe=true;selectMode='pipe';renderPipeFields();checkDraft();return;}
     const placementRow=target.closest('[data-rp-id]'),placementKind=target.closest('#rp-clips')?'clip':target.closest('#rp-obstacles')?'obstacle':null;if(placementRow&&placementKind){selectedPlacement={kind:placementKind,id:placementRow.dataset.rpId};activeWall=Number(placementRow.querySelector('[data-rp-field="segment"]').value);activePosition=Number(placementRow.querySelector('[data-rp-field="position"]').value);q('rp-active-wall').value=String(activeWall);markSelected();markPlacementRows();}
     if(target.closest('#rp-walls')){readWallRows();updateSegmentChoices();selectMode='wall';}
     if(target.id==='rp-side')wall.side=target.value;
@@ -296,6 +302,9 @@ export function initRoomPlanner({getProject,onApply,language}) {
     for(const item of frame.polygons){const polygon=item.points;let inside=false,distance=Infinity;for(let i=0,j=polygon.length-1;i<polygon.length;j=i++){const a=polygon[j],b=polygon[i];if((a[1]>point[1])!==(b[1]>point[1])&&point[0]<(b[0]-a[0])*(point[1]-a[1])/(b[1]-a[1])+a[0])inside=!inside;distance=Math.min(distance,segmentDistance(point,a,b));}if(inside||distance*pixelsPerMm<=6){selectPlacement('obstacle',item.id);return true;}}
     return false;
   }
+  function detourNoticePair(){if(!detourNoticeContext||manualPipe||pendingPipeEdit)return null;const data=input();if(!validDetourPair(detourNoticeContext,data)||!sameDetourContext(detourNoticeContext.input,data)||!sameDetourContext(detourNoticeContext.points,draftPoints)){detourNoticeContext=null;return null;}return{requested:detourNoticeContext.requested,used:detourNoticeContext.used};}
+  function renderDetourNotice(){const node=q('rp-angle-notice');if(!node)return;const notice=detourNoticePair();node.hidden=!notice;const message=notice?tr('detourFallback').replace('{requested}',format(notice.requested)).replace('{used}',format(notice.used)):'';if(node.textContent!==message)node.textContent=message;if(notice){node.setAttribute('data-requested-angle',String(notice.requested));node.setAttribute('data-used-angle',String(notice.used));}else{node.removeAttribute('data-requested-angle');node.removeAttribute('data-used-angle');}}
+  function clearDetourNotice(){detourNoticeContext=null;renderDetourNotice();}
   function showView(){
     if(!dialog.open){pipeViewHidden=!!pipeView?.hidden;returnScroll=Number(globalThis.scrollY)||0;previousHash=globalThis.location?.hash||'';if(previousHash!=='#wall-planner'&&globalThis.history?.pushState){globalThis.history.pushState({wallPlanner:true},'','#wall-planner');pushedView=true;}else pushedView=previousHash==='#wall-planner'&&globalThis.history?.state?.wallPlanner===true;}
     if(pipeView)pipeView.hidden=true;document.body.classList.add('wall-planner-active');dialog.hidden=false;dialog.open=true;globalThis.scrollTo?.(0,0);
@@ -334,19 +343,19 @@ export function initRoomPlanner({getProject,onApply,language}) {
   function removeWall(index){wall.lengths.splice(index,1);if(wall.turns.length)wall.turns.splice(index===0?0:index-1,1);updateSegmentChoices(i=>i===index?-1:i>index?i-1:i);activeWall=Number(q('rp-active-wall').value);activePosition=null;renderWallRows();invalidate(true);}
   function showError(message){error.textContent=message||'';}
   function invalidate(clear){
-    updateAngleHelp();result=null;q('rp-apply').disabled=true;showError('');status.textContent=tr(clear?'changed':'edited');q('rp-summary').textContent='';
+    clearDetourNotice();updateAngleHelp();result=null;q('rp-apply').disabled=true;showError('');status.textContent=tr(clear?'changed':'edited');q('rp-summary').textContent='';
     if(clear&&!manualPipe){draftPoints=[];lastSafe=null;pipeUndo=[];selectedPipe=null;numericPipeInvalid=false;renderPoints();}
     else if(draftPoints.length>=2&&manualPipe){checkDraft();return;}
     else renderPoints();
     draw();persistDraft();
   }
   function accept(next){
-    if(!next?.ok){result=null;q('rp-apply').disabled=true;showError(roomPlannerError(next,languageValue()));status.textContent='';renderPoints();pipeFeedback(false,error.textContent);draw();persistDraft();return false;}
+    if(!next?.ok){clearDetourNotice();result=null;q('rp-apply').disabled=true;showError(roomPlannerError(next,languageValue()));status.textContent='';renderPoints();pipeFeedback(false,error.textContent);draw();persistDraft();return false;}
     result=next;draftPoints=clone(next.points);numericPipeInvalid=false;q('rp-apply').disabled=false;showError('');status.textContent=tr('validated');q('rp-summary').textContent=next.turns.length+' '+tr('bends')+' · '+tr('length')+': '+format(next.geometricLength)+' mm';lastSafe=pipeSnapshot();renderPoints();pipeFeedback(true,tr('validated'));draw();persistDraft();return true;
   }
-  function pipeSnapshot(){return{points:clone(draftPoints),start:clone(input().start),end:clone(input().end),selected:selectedPipe?{...selectedPipe}:null,adjustments:clone(autoAdjustments)};}
+  function pipeSnapshot(){return{points:clone(draftPoints),start:clone(input().start),end:clone(input().end),selected:selectedPipe?{...selectedPipe}:null,adjustments:clone(autoAdjustments),manual:manualPipe,detourContext:detourNoticePair()?clone(detourNoticeContext):null};}
   function writeAnchor(key,data){fillSegmentSelect(q('rp-'+key+'-wall'),data.segment);setNumericField(q('rp-'+key+'-position'),data.position);}
-  function restoreSnapshot(saved){q('rp-select-pipe').focus({preventScroll:true});pendingPipeEdit=null;autoAdjustments=clone(saved.adjustments||[]);numericPipeInvalid=false;draftPoints=clone(saved.points);writeAnchor('start',saved.start);writeAnchor('end',saved.end);selectedPipe=saved.selected?{...saved.selected}:null;manualPipe=true;selectMode='pipe';renderPoints();checkDraft();}
+  function restoreSnapshot(saved){q('rp-select-pipe').focus({preventScroll:true});pendingPipeEdit=null;autoAdjustments=clone(saved.adjustments||[]);numericPipeInvalid=false;draftPoints=clone(saved.points);writeAnchor('start',saved.start);writeAnchor('end',saved.end);selectedPipe=saved.selected?{...saved.selected}:null;manualPipe=saved.manual===false?false:true;detourNoticeContext=saved.detourContext?clone(saved.detourContext):null;selectMode='pipe';renderPoints();checkDraft();}
   function rememberPipe(){if(draftPoints.length<2)return;pipeUndo.push(pipeSnapshot());if(pipeUndo.length>50)pipeUndo.shift();}
   function undoPipeEdit(){const previous=pipeUndo.pop();if(previous)restoreSnapshot(previous);}
   function restoreSafePipe(){if(lastSafe){rememberPipe();restoreSnapshot(lastSafe);}}
@@ -374,14 +383,14 @@ export function initRoomPlanner({getProject,onApply,language}) {
     selectedPipe={type,index};selectMode='pipe';
     const field=q('rp-pipe-fields').querySelector('[data-pipe-type="'+type+'"][data-pipe-index="'+index+'"]');
     const raw=field?.value||'',direction=type==='turn'?Number(q('rp-pipe-fields').querySelector('[data-pipe-direction="'+index+'"]')?.value):1;
-    const reject=failed=>{pendingPipeEdit={type,index,raw,direction,code:failed.code||'EDIT_NO_SOLUTION',error:failed.error||'Rettelsen kunne ikke tilpasses. Røret er ikke ændret. Prøv et andet mål eller en anden vinkel.'};numericPipeInvalid=true;manualPipe=true;result=null;status.textContent='';q('rp-apply').disabled=true;renderPipeFields();showError(pendingMessage());pipeFeedback(false,pendingMessage());draw();persistDraft();};
+    const reject=failed=>{clearDetourNotice();pendingPipeEdit={type,index,raw,direction,code:failed.code||'EDIT_NO_SOLUTION',error:failed.error||'Rettelsen kunne ikke tilpasses. Røret er ikke ændret. Prøv et andet mål eller en anden vinkel.'};numericPipeInvalid=true;manualPipe=true;result=null;status.textContent='';q('rp-apply').disabled=true;renderPipeFields();showError(pendingMessage());pipeFeedback(false,pendingMessage());draw();persistDraft();};
     if(!field||!field.reportValidity()||!Number.isFinite(Number(field.value))){reject({code:'EDIT_INVALID_VALUE',error:'Indtast en gyldig positiv længde eller bukkevinkel under 179°.'});return;}
     let nextValue=fieldValue(field);if(type==='turn')nextValue=Math.abs(nextValue)*direction;
     let changed;try{changed=solveWallPipeEdit(input(),draftPoints,{type,index,value:nextValue});}catch{changed={ok:false,code:'EDIT_NO_SOLUTION'};}
     if(!changed.ok){reject(changed);return;}
     const different=JSON.stringify(changed.points)!==JSON.stringify(draftPoints);
     if(different){rememberPipe();autoAdjustments=[...(changed.adjustments?.lengths||[]).filter(change=>type!=='length'||change.index!==index).map(change=>({...change,type:'length'})),...(changed.adjustments?.turns||[]).filter(change=>type!=='turn'||change.index!==index).map(change=>({...change,type:'turn'}))];}
-    pendingPipeEdit=null;draftPoints=clone(changed.points);numericPipeInvalid=false;manualPipe=true;renderPoints();checkDraft();
+    clearDetourNotice();pendingPipeEdit=null;draftPoints=clone(changed.points);numericPipeInvalid=false;manualPipe=true;renderPoints();checkDraft();
   }
   function renderPipeFields(){
     const model=pipeModelFromPoints(draftPoints),fields=q('rp-pipe-fields');q('rp-select-pipe').disabled=!model.ok;
@@ -412,7 +421,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
   function fieldOK(field){if(field.disabled)return true;if(field.validity)return field.validity.valid;if(field.hasAttribute('required')&&field.value==='')return false;if(field.getAttribute('type')==='number'){const n=Number(field.value);return field.value!==''&&Number.isFinite(n)&&(!field.hasAttribute('min')||n>=Number(field.getAttribute('min')))&&(!field.hasAttribute('max')||n<=Number(field.getAttribute('max')));}return true;}
   function validPipeFields(){return[...q('rp-pipe-fields').querySelectorAll('input,select'),...q('rp-points').querySelectorAll('input')].every(field=>field.reportValidity());}
   function validSettings(){for(const field of [...settings.querySelectorAll('input,select')].filter(field=>!field.closest('#rp-wall-builder'))){if(fieldOK(field))continue;const panel=field.closest('[role="tabpanel"]');if(panel){selectMode='wall';setSettingsTab(panel.id.replace('rp-panel-',''));const row=field.closest('[data-wall-row]');if(row)row.open=true;draw();}field.reportValidity();field.focus?.({preventScroll:false});return false;}return true;}
-  function generate(){if(!wall.lengths.length){showError(tr('noWalls'));return;}if(!validSettings()){showError(tr('invalid'));return;}try{const proposal=generateWallRoute(input());if(proposal.ok){pipeUndo=[];lastSafe=null;selectedPipe=null;pendingPipeEdit=null;autoAdjustments=[];manualPipe=false;numericPipeInvalid=false;selectMode='pipe';}accept(proposal);}catch{accept({ok:false,error:tr('unexpected')});}}
+  function generate(){clearDetourNotice();if(!wall.lengths.length){showError(tr('noWalls'));return;}if(!validSettings()){showError(tr('invalid'));return;}try{const data=input(),proposal=generateWallRoute(data);if(proposal.ok){pipeUndo=[];lastSafe=null;selectedPipe=null;pendingPipeEdit=null;autoAdjustments=[];manualPipe=false;numericPipeInvalid=false;selectMode='pipe';const pair={requested:proposal.requestedDetourAngle,used:proposal.detourAngle};if(proposal.detourAngleFallback&&validDetourPair(pair,data))detourNoticeContext={...pair,input:clone(data),points:clone(proposal.points)};}accept(proposal);}catch{accept({ok:false,error:tr('unexpected')});}}
   function validate(){if(pendingPipeEdit){showError(pendingMessage());return;}if(numericPipeInvalid||!validSettings()||!validPipeFields()){showError(tr('invalid'));return;}try{readPoints();accept(validateWallRoute(input(),draftPoints));}catch{accept({ok:false,error:tr('unexpected')});}}
   function readPoints(){const coordinate=field=>field.value===field.dataset.shownValue?Number(field.dataset.originalValue):Number(field.value);draftPoints=[...q('rp-points').children].map(row=>[coordinate(row.querySelector('[data-axis="x"]')),coordinate(row.querySelector('[data-axis="y"]'))]);}
   function renderPoints(){
@@ -421,21 +430,22 @@ export function initRoomPlanner({getProject,onApply,language}) {
       body.replaceChildren();draftPoints.forEach((point,index)=>{
         const row=el('tr');row.append(el('th',{scope:'row'},index===0?'A':index===draftPoints.length-1?'B':String(index)));
         for(const axis of ['x','y']){const cell=el('td'),field=el('input',{type:'number',step:'any',required:'','data-axis':axis,'aria-label':tr('point')+' '+(index+1)+' · '+axis.toUpperCase()+' mm'});cell.append(field);row.append(cell);}
-        const last=el('td');if(index>0&&index<draftPoints.length-1)last.append(button('remove',()=>{rememberPipe();pendingPipeEdit=null;autoAdjustments=[];readPoints();draftPoints.splice(index,1);numericPipeInvalid=false;manualPipe=true;checkDraft();},{class:'rp-remove'}));row.append(last);body.append(row);
+        const last=el('td');if(index>0&&index<draftPoints.length-1)last.append(button('remove',()=>{rememberPipe();clearDetourNotice();pendingPipeEdit=null;autoAdjustments=[];readPoints();draftPoints.splice(index,1);numericPipeInvalid=false;manualPipe=true;checkDraft();},{class:'rp-remove'}));row.append(last);body.append(row);
       });
     }
     [...body.children].forEach((row,index)=>{row.querySelector('th').textContent=index===0?'A':index===draftPoints.length-1?'B':String(index);for(const [axis,n]of [['x',0],['y',1]])setNumericField(row.querySelector('[data-axis="'+axis+'"]'),draftPoints[index][n]);});
   }
 
-  function addPoint(){if(draftPoints.length<2||pendingPipeEdit||!validPipeFields())return;rememberPipe();autoAdjustments=[];readPoints();const a=draftPoints.at(-2),b=draftPoints.at(-1);draftPoints.splice(draftPoints.length-1,0,[(a[0]+b[0])/2,(a[1]+b[1])/2]);manualPipe=true;numericPipeInvalid=false;result=null;q('rp-apply').disabled=true;showError('');status.textContent=tr('edited');renderPoints();pipeFeedback(false,tr('edited'));draw();persistDraft();}
-  async function apply(){if(!result?.ok||numericPipeInvalid||!validSettings()||!validPipeFields())return;try{readPoints();const data=input(),checked=validateWallRoute(data,draftPoints);if(!accept(checked))return;q('rp-apply').disabled=true;await onApply({lengths:clone(checked.lengths),turns:clone(checked.turns),heading:checked.heading,start:clone(checked.start),planner:{version:2,input:clone(data),points:clone(checked.points),pipeEdited:manualPipe}});dialog.close();}catch(exception){showError(exception?.message||tr('rejected'));q('rp-apply').disabled=!result?.ok;}}
+  function addPoint(){if(draftPoints.length<2||pendingPipeEdit||!validPipeFields())return;rememberPipe();clearDetourNotice();autoAdjustments=[];readPoints();const a=draftPoints.at(-2),b=draftPoints.at(-1);draftPoints.splice(draftPoints.length-1,0,[(a[0]+b[0])/2,(a[1]+b[1])/2]);manualPipe=true;numericPipeInvalid=false;result=null;q('rp-apply').disabled=true;showError('');status.textContent=tr('edited');renderPoints();pipeFeedback(false,tr('edited'));draw();persistDraft();}
+  async function apply(){if(!result?.ok||numericPipeInvalid||!validSettings()||!validPipeFields())return;try{readPoints();const data=input(),checked=validateWallRoute(data,draftPoints);if(!accept(checked))return;q('rp-apply').disabled=true;await onApply({lengths:clone(checked.lengths),turns:clone(checked.turns),heading:checked.heading,start:clone(checked.start),planner:{version:2,input:clone(data),points:clone(checked.points),pipeEdited:manualPipe,...(detourNoticePair()?{pipeDetourNotice:detourNoticePair()}:{})}});dialog.close();}catch(exception){showError(exception?.message||tr('rejected'));q('rp-apply').disabled=!result?.ok;}}
   function format(n){return Number(n).toLocaleString({da:'da-DK',nb:'nb-NO',en:'en-GB'}[languageValue()]||'da-DK',{maximumFractionDigits:1});}
-  function updateAngleHelp(){const limit=value('rp-max-angle');q('rp-angle-hint').textContent=wallBendAngleHint(limit,languageValue());q('rp-allow-90').hidden=!Number.isFinite(limit)||limit<=0||limit>=90;}
+  function updateAngleHelp(){renderDetourNotice();const limit=value('rp-max-angle');q('rp-angle-hint').textContent=wallBendAngleHint(limit,languageValue());q('rp-allow-90').hidden=!Number.isFinite(limit)||limit<=0||limit>=90;}
   function refresh(){updateAngleHelp();settingsTabs.setAttribute('aria-label',tr('settingsTabs'));zoomIn.setAttribute('aria-label',tr('zoomIn'));zoomOut.setAttribute('aria-label',tr('zoomOut'));zoomFit.setAttribute('aria-label',tr('zoomFit'));for(const node of dialog.querySelectorAll('[data-rp-text]')){const key=node.dataset.rpText;if(node.tagName==='LABEL'){const first=node.firstChild;if(first?.nodeType===3)first.nodeValue=tr(key);else node.prepend(document.createTextNode(tr(key)));}else node.textContent=tr(key);}const p=getProject();q('rp-tool-summary').textContent=tr('diameter')+': '+format(p.diameter)+' mm · '+tr('radius')+': '+format(p.radius)+' mm';if(opened){renderWallRows();updateSegmentChoices();renderPipeFields();}markPlacementRows();renderAdjustments();if(pendingPipeEdit){showError(pendingMessage());pipeFeedback(false,pendingMessage());}if(dialog.open)draw();}
   function defaultInput(){return defaultWallPlanInput();}
   function open(){
     let savedIssue=false;const active=document.activeElement;if(!dialog.open)returnFocus=active?.closest('#app-menu')?document.querySelector('#app-menu > summary'):active;const key=fingerprint(),reuse=opened&&key===projectKey;
-    if(!reuse){activeSettingsTab='walls';selectedPlacement=null;selectMode='wall';setSettingsTab('walls');pipeUndo=[];lastSafe=null;selectedPipe=null;manualPipe=false;numericPipeInvalid=false;pendingPipeEdit=null;autoAdjustments=[];const stored=storedDraft()||migrateRoomPlanner(getProject().planner);savedIssue=!!(stored?.error||stored?.savedError);migrated=!!stored?.migrated;manualPipe=!!stored?.pipeEdited||!!stored?.routeEdited;writeInput(stored?.input?{...defaultInput(),...clone(stored.input)}:defaultInput());draftPoints=stored&&Array.isArray(stored.points)?clone(stored.points):[];
+    if(!reuse){detourNoticeContext=null;activeSettingsTab='walls';selectedPlacement=null;selectMode='wall';setSettingsTab('walls');pipeUndo=[];lastSafe=null;selectedPipe=null;manualPipe=false;numericPipeInvalid=false;pendingPipeEdit=null;autoAdjustments=[];const stored=storedDraft()||migrateRoomPlanner(getProject().planner);savedIssue=!!(stored?.error||stored?.savedError);migrated=!!stored?.migrated;manualPipe=!!stored?.pipeEdited||!!stored?.routeEdited;writeInput(stored?.input?{...defaultInput(),...clone(stored.input)}:defaultInput());draftPoints=stored&&Array.isArray(stored.points)?clone(stored.points):[];
+      if(!manualPipe&&validDetourPair(stored?.pipeDetourNotice,input())&&sameDetourContext(stored.input,input()))detourNoticeContext={...stored.pipeDetourNotice,input:clone(input()),points:clone(draftPoints)};
       const pending=stored?.pipeEditPending,model=pipeModelFromPoints(draftPoints);if(model.ok&&pending&&['length','turn'].includes(pending.type)&&Number.isInteger(pending.index)&&pending.index>=0&&pending.index<(pending.type==='length'?model.lengths:model.turns).length&&typeof pending.raw==='string'&&pending.raw.length<100){pendingPipeEdit={type:pending.type,index:pending.index,raw:pending.raw,direction:pending.direction===-1?-1:1,code:String(pending.code||'EDIT_NO_SOLUTION'),error:String(pending.error||'Rettelsen kunne ikke tilpasses. Røret er ikke ændret.')};selectedPipe={type:pending.type,index:pending.index};numericPipeInvalid=true;manualPipe=true;}
       autoAdjustments=Array.isArray(stored?.pipeAdjustments)?stored.pipeAdjustments.filter(change=>['length','turn'].includes(change.type)&&Number.isInteger(change.index)&&change.index>=0&&Number.isFinite(change.from)&&Number.isFinite(change.to)).slice(0,400):[];result=null;q('rp-apply').disabled=true;status.textContent='';showError('');q('rp-summary').textContent='';viewport.reset();
     }
@@ -531,7 +541,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
     updateLocalAnnotations(state);
   }
   function draw(){
-    if(!dialog.open)return;detailFrame=null;
+    if(!dialog.open)return;renderDetourNotice();detailFrame=null;
     const focused=document.activeElement,focusAttribute=['data-wall-reference','data-wall-label','data-segment','data-pipe-length','data-pipe-bend'].find(key=>focused?.hasAttribute?.(key)),focusIndex=focusAttribute?focused.getAttribute(focusAttribute):null;
     const data=input(),layout=wallLayout(data),width=Math.max(280,visual.clientWidth||600),height=Math.min(width<480?310:430,Math.max(180,Math.floor((Number(globalThis.innerHeight)||1100)*0.42))),margin=Math.min(72,Math.max(42,height/5));
     dialog.setAttribute('data-select-mode',selectMode);settings.hidden=selectMode==='pipe';wallOverview.hidden=selectMode==='pipe';q('rp-route-editor').hidden=selectMode!=='pipe'||draftPoints.length<2;

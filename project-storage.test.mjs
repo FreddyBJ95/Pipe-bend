@@ -65,4 +65,24 @@ for(const bad of [null,{}, {...measured,points:[[0,0]]},{...measured,points:[[0,
 const portable=JSON.parse(JSON.stringify({...project,wallDraft:normalized}));
 const imported={...portable,projectId:other.projectId};delete imported.wallDraft;
 writeWallDraft(imported,normalizeWallDraft(portable.wallDraft),db);assert.deepEqual(readWallDraft(imported,db,normalizeWallDraft),normalized);
+// A generated angle fallback is portable context, never a substitute for
+// fresh physical route validation. Manual/pending/empty drafts drop it.
+const fallbackDraft={...measured,points:[[200,16],[2200,16]],pipeDetourNotice:{requested:90,used:45}};
+const fallbackBefore=structuredClone(fallbackDraft),fallbackCopy=normalizeWallDraft(fallbackDraft);
+assert.deepEqual(fallbackCopy.pipeDetourNotice,{requested:90,used:45});
+assert.deepEqual(fallbackDraft,fallbackBefore);
+fallbackCopy.pipeDetourNotice.used=30;
+assert.equal(fallbackDraft.pipeDetourNotice.used,45);
+writeWallDraft(imported,normalizeWallDraft(fallbackDraft),db);
+assert.deepEqual(readWallDraft(imported,db,normalizeWallDraft).pipeDetourNotice,{requested:90,used:45});
+for(const edited of [
+ {...fallbackDraft,pipeEdited:true},
+ {...fallbackDraft,routeEdited:true},
+ {...fallbackDraft,pipeEditPending:pending.pipeEditPending},
+ {...fallbackDraft,points:[]},
+])assert.equal(normalizeWallDraft(edited).pipeDetourNotice,undefined);
+for(const pair of [true,[],{requested:90,used:90},{requested:90,used:0},{requested:90,used:NaN},{requested:60,used:45},{requested:180,used:45},{requested:'90',used:45}]){
+ assert.ok(normalizeWallDraft({...fallbackDraft,pipeDetourNotice:pair}).error,'Malformed or mismatched angle context must not enter a portable draft');
+}
+
 console.log('Project draft storage: stable identity, rename safety, independent copies, legacy migration, tombstones and atomic writes PASS');

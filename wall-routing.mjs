@@ -1,6 +1,6 @@
 // Measured, open wall chains. All lengths are mm, turns are signed degrees,
 // heading is radians. The pipe is checked with its real constant-radius arcs.
-import {buildRouteGeometry,splitRouteCorners,validateRouteSelfCollision,pointSegmentDistance,segmentDistance} from './room-routing.mjs?v=33';
+import {buildRouteGeometry,splitRouteCorners,validateRouteSelfCollision,pointSegmentDistance,segmentDistance} from './room-routing.mjs?v=34';
 
 const EPS=1e-7,CLIP_TOLERANCE=0.25;
 const add=(a,b)=>[a[0]+b[0],a[1]+b[1]],sub=(a,b)=>[a[0]-b[0],a[1]-b[1]],mul=(a,k)=>[a[0]*k,a[1]*k];
@@ -149,7 +149,11 @@ function cleanSegments(nodes,segment) {
   for(let i=0;i<nodes.length-1;i++)if(distance(nodes[i],nodes[i+1])>EPS)result.push({a:nodes[i],b:nodes[i+1],segment});
   return result;
 }
-function buildSegments(c,padding,ramps=false) {
+function obstacleAngleTiers(maxAngle) {
+  const requested=Math.min(90,maxAngle),squareAngle=90/Math.ceil((90-EPS)/maxAngle);
+  return [requested,...[60,45,30,squareAngle].filter(angle=>angle<requested-EPS)].filter((angle,index,list)=>list.findIndex(other=>Math.abs(other-angle)<EPS)===index).sort((a,b)=>b-a);
+}
+function buildSegments(c,padding,ramps=false,detourAngle=Math.min(90,c.maxAngle)) {
   const depth=c.wallGap+c.diameter/2,extra=c.diameter/2+c.clearance,segments=[];
   const lowSegment=Math.min(c.start.segment,c.end.segment),highSegment=Math.max(c.start.segment,c.end.segment);
   const walls=c.layout.closed?c.layout.segments:c.layout.segments.slice(lowSegment,highSegment+1);
@@ -169,7 +173,12 @@ function buildSegments(c,padding,ramps=false) {
       if(event.a<a-EPS||event.b>b+EPS)return null;
       groups.push(event);
     }
-    const run=g=>ramps?(g.top-depth)/Math.tan(radians(Math.min(45,c.maxAngle))):0;
+    const availableAngles=obstacleAngleTiers(c.maxAngle);
+    const angleFor=g=>detourAngle==='adaptive'?availableAngles.find(angle=>{
+      const theta=radians(angle);
+      return (g.top-depth)/Math.sin(theta)-2*c.radius*Math.tan(theta/2)>0.01;
+    })??availableAngles.at(-1):detourAngle;
+    const run=g=>ramps?(g.top-depth)/Math.tan(radians(angleFor(g))):0;
     groups.sort((x,y)=>x.a-y.a);const merged=[];
     for(const g of groups) {
       merged.push({...g});
@@ -179,13 +188,18 @@ function buildSegments(c,padding,ramps=false) {
         merged.splice(-2,2,{a:Math.min(previous.a,current.a),b:Math.max(previous.b,current.b),top:Math.max(previous.top,current.top)});
       }
     }
-    const nodes=[[a,depth]];
+    const nodes=[[a,depth]],edgeAngles=[];
+    const append=(point,angle=null)=>{edgeAngles.push(angle);nodes.push(point);};
     for(const g of merged) {
-      const ramp=run(g);
+      const ramp=run(g),angle=angleFor(g);
       if(g.a-ramp<a-EPS||g.b+ramp>b+EPS)return null;
-      nodes.push([g.a-ramp,depth],[g.a,g.top],[g.b,g.top],[g.b+ramp,depth]);
+      append([g.a-ramp,depth]);append([g.a,g.top],angle);append([g.b,g.top],angle);append([g.b+ramp,depth],angle);
     }
-    nodes.push([b,depth]);segments.push(...cleanSegments(nodes.map(([s,d])=>localPoint(wall,s,d)),wall.index));
+    append([b,depth]);
+    for(let j=0;j<nodes.length-1;j++){
+      const start=localPoint(wall,...nodes[j]),end=localPoint(wall,...nodes[j+1]);
+      if(distance(start,end)>EPS)segments.push({a:start,b:end,segment:wall.index,detourAngle:edgeAngles[j]});
+    }
   }
   return segments;
 }
@@ -201,7 +215,7 @@ function insertClipWindows(c,original) {
       const a=localCoordinates(wall,s.a),b=localCoordinates(wall,s.b),base=a[1],transition=half+Math.max(Math.abs(depth-base)/Math.tan(theta),c.radius*0.5);
       if(position-transition<a[0]-EPS||position+transition>b[0]+EPS)continue;
       const nodes=[a,[position-transition,base],[position-half,depth],[position+half,depth],[position+transition,base],b].map(([p,d])=>localPoint(wall,p,d));
-      segments.splice(i,1,...cleanSegments(nodes,anchor.segment));inserted=true;break;
+      segments.splice(i,1,...cleanSegments(nodes,anchor.segment).map(part=>({...part,detourAngle:s.detourAngle??null})));inserted=true;break;
     }
     if(!inserted)return null;
   }
@@ -274,47 +288,78 @@ const routeScore=(route,radius)=>route.geometricLength+route.turns.length*radius
 /** Follow only the wall chain the user measured; never invent room dimensions. */
 export function generateWallRoute(input) {return generateWallRouteInternal(input,true);}
 
-function generateWallRouteInternal(input,allowProfile) {
+function detourChoice(route,angles,requested) {
+  const used=route.turns.length?angles.filter((angle,index,list)=>list.findIndex(other=>Math.abs(other-angle)<EPS)===index).sort((a,b)=>b-a):[];
+  const angle=used.length?Math.min(...used):null,fallback=angle!==null&&angle<requested-EPS;
+  return {...route,requestedDetourAngle:requested,detourAngles:used,detourAngle:angle,detourAngleFallback:fallback,warnings:fallback?['DETOUR_ANGLE_FALLBACK']:[]};
+}
+function pathDetourAngles(segments,points) {
+  const detours=segments.filter(segment=>finite(segment.detourAngle)),angles=[];
+  for(let index=0;index<points.length-1;index++){
+    const midpoint=mul(add(points[index],points[index+1]),.5);
+    for(const segment of detours)if(pointSegmentDistance(midpoint,segment.a,segment.b)<EPS)angles.push(segment.detourAngle);
+  }
+  return angles;
+}
+function generateWallRouteInternal(input,allowProfile,forcedAngle=null) {
   const parsed=normalize(input);if(!parsed.ok)return parsed;
-  const c=parsed.config,candidates=[],errors=[];
+  const c=parsed.config,errors=[],requested=Math.min(90,c.maxAngle);
+  // The selected limit is also the first obstacle angle to try. Smaller
+  // detours cannot win merely because their diagonal route uses less tube.
+  // A split square is another construction for its actual resulting angle.
+  const squareAngle=90/Math.ceil((90-EPS)/c.maxAngle);
+  const tiers=forcedAngle===null?['adaptive',...obstacleAngleTiers(c.maxAngle)]:[forcedAngle];
   const station=a=>c.layout.segments[a.segment].startStation+a.position;
   const forward=station(c.end)>station(c.start),directions=c.layout.closed?[1,-1]:[forward?1:-1];
   if(!c.layout.closed&&c.clips.some(a=>station(a)<Math.min(station(c.start),station(c.end))-EPS||station(a)>Math.max(station(c.start),station(c.end))+EPS))return fail('En klamme ligger uden for strækningen mellem rørets start og slut. Flyt klammen eller endepunkterne.','CLIP_ORDER');
+  const envelope=allowProfile?wallProfileEnvelope(c):null;
   // Split corners need a larger construction circle than the real tool
   // radius, otherwise the new neighbouring bends leave zero straight tube.
   const factors=[1.25,1.6,2.2,1.05,1.01];
-  for(const padFactor of [0.5,1,1.5,2.5,4]) {
-    for(const ramps of [true,false]) {
-    const base=buildSegments(c,c.radius*padFactor,ramps);
-    if(!base){errors.push(fail('Der er for lidt plads ved et væghjørne eller en forhindring. Flyt forhindringen eller øg vægafstanden.','CORNER_SPACE'));continue;}
-    const segments=insertClipWindows(c,base);
-    if(!segments){errors.push(fail('Der er ikke plads til klammernes vægafstande mellem hjørner og forhindringer.','CLIP_SPACE'));continue;}
-    for(const direction of directions) {
-      const nominal=cutPath(segments,c.startPoint,c.endPoint,c.layout.closed,direction);
-      if(!nominal){errors.push(fail('Start eller slut ligger for tæt ved et hjørne eller en forhindring. Flyt endepunktet længere ind på vægstykket.','ENDPOINT_SPACE'));continue;}
-      for(const factor of factors) {
-        const points=splitRouteCorners(nominal,c.radius,c.maxAngle,factor);
-        if(!points){errors.push(fail('Der er ikke plads til den valgte maksimale bukkevinkel.','MAX_ANGLE_SPACE'));continue;}
-        const result=validateWallRoute(c,points);
-        if(result.ok)candidates.push({...result,direction:direction===1?'forward':'reverse',proposal:'measured-wall',score:routeScore(result,c.radius)});
-        else if(result.code==='TOO_COMPLEX')return result;else errors.push(result);
+  for(const angle of tiers) {
+    const candidates=[];
+    for(const padFactor of [0.5,1,1.5,2.5,4]) {
+      const modes=angle!=='adaptive'&&Math.abs(angle-squareAngle)<EPS?[true,false]:[true];
+      for(const ramps of modes) {
+        const base=buildSegments(c,c.radius*padFactor,ramps,angle);
+        if(!base){errors.push(fail('Der er for lidt plads ved et væghjørne eller en forhindring. Flyt forhindringen eller øg vægafstanden.','CORNER_SPACE'));continue;}
+        const segments=insertClipWindows(c,base);
+        if(!segments){errors.push(fail('Der er ikke plads til klammernes vægafstande mellem hjørner og forhindringer.','CLIP_SPACE'));continue;}
+        for(const direction of directions) {
+          const nominal=cutPath(segments,c.startPoint,c.endPoint,c.layout.closed,direction);
+          if(!nominal){errors.push(fail('Start eller slut ligger for tæt ved et hjørne eller en forhindring. Flyt endepunktet længere ind på vægstykket.','ENDPOINT_SPACE'));continue;}
+          const angles=pathDetourAngles(segments,nominal);
+          for(const factor of factors) {
+            const points=splitRouteCorners(nominal,c.radius,c.maxAngle,factor);
+            if(!points){errors.push(fail('Der er ikke plads til den valgte maksimale bukkevinkel.','MAX_ANGLE_SPACE'));continue;}
+            const result=validateWallRoute(c,points);
+            if(result.ok)candidates.push({...detourChoice(result,angles,requested),direction:direction===1?'forward':'reverse',proposal:'measured-wall',score:routeScore(result,c.radius)});
+            else if(result.code==='TOO_COMPLEX')return result;else errors.push(result);
+          }
+        }
       }
+      if(candidates.length)break;
     }
-    }
-    if(candidates.length)break;
-  }
-  if(allowProfile) {
-    const envelope=wallProfileEnvelope(c);
+    // Profile construction obeys the same angle tier and is validated against
+    // the original measured geometry before lower obstacle angles are tried.
     if(envelope) {
-      const proposal=generateWallRouteInternal(envelope,false);
+      const proposal=generateWallRouteInternal(envelope,false,angle);
       if(proposal.ok) {
         const checked=validateWallRoute(c,proposal.points);
-        if(checked.ok)candidates.push({...checked,direction:proposal.direction,proposal:'measured-wall-profile',score:routeScore(checked,c.radius)});
+        if(checked.ok)candidates.push({...detourChoice(checked,proposal.detourAngles,requested),direction:proposal.direction,proposal:'measured-wall-profile',score:routeScore(checked,c.radius)});
         else errors.push(checked);
       }else errors.push(proposal);
     }
+    if(candidates.length) {
+      // Angle fulfillment outranks shorter tube, including when a profile
+      // candidate and a direct wall candidate use different local angles.
+      const minimum=route=>route.detourAngle??requested;
+      const maximum=route=>route.detourAngles.length?Math.max(...route.detourAngles):requested;
+      candidates.sort((a,b)=>Number(a.detourAngleFallback)-Number(b.detourAngleFallback)||minimum(b)-minimum(a)||maximum(b)-maximum(a)||a.score-b.score||a.turns.length-b.turns.length);
+      const {score,...result}=candidates[0];return result;
+    }
   }
-  if(!candidates.length) {
+  {
     const specific=errors.find(e=>['MISSED_CLIP','OBSTACLE_COLLISION','INSUFFICIENT_STRAIGHT','WALL_COLLISION'].includes(e.code))??errors[0];
     const suggestions={
       WALL_COLLISION:'Der er for lidt plads ved et væghjørne med den valgte radius og vægafstand. Prøv større vægafstand, mindre radius eller en anden placering af start, slut og klammer.',
@@ -326,6 +371,4 @@ function generateWallRouteInternal(input,allowProfile) {
     const details=suggestions[specific?.code]??specific?.error;
     return {...fail(details?`Intet kontrolleret rørforslag fundet. ${details}`:'Der er ikke plads til et rørforslag langs væggen.','NO_ROUTE'),reasonCode:specific?.code};
   }
-  candidates.sort((a,b)=>a.score-b.score||a.turns.length-b.turns.length);
-  const {score,...result}=candidates[0];return result;
 }
