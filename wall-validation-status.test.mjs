@@ -37,4 +37,16 @@ const oldRoute=generateRoomRoute(oldInput);assert.equal(oldRoute.ok,true,oldRout
 const legacy={...project,lengths:oldRoute.lengths,turns:oldRoute.turns,heading:oldRoute.heading,placement:{start:oldRoute.start},planner:{version:1,input:oldInput,points:oldRoute.points}};
 assert.equal(wallValidationStatus(legacy).status,'checked');
 assert.deepEqual(project,original,'Status checks do not mutate measured walls, points or current project');
+// A valid XY wall result is never proof that an out-of-plane pipe clears
+// walls or obstacles. Those pipes retain the measured draft and need 3D checks.
+const zeroRotations=project.turns.map(()=>0);
+assert.equal(wallValidationStatus({...project,bendRotations:zeroRotations}).status,'checked','Explicit legacy-plane rotations keep the same physical route');
+for(const roll of [90,-90,37.5,180]){
+ const rotations=zeroRotations.slice();rotations[0]=roll;
+ const status=wallValidationStatus({...project,bendRotations:rotations});
+ assert.equal(status.code,'SPATIAL_PIPE_UNCHECKED');assert.equal(status.checked,false);assert.equal(status.status,'needs-check');assert.match(status.messageKey,/højdeskift/);assert.match(status.detailKey,/2D/);
+}
+assert.equal(wallValidationStatus({...project,startFrame:{tangent:[1,0,0],normal:[0,0,1]}}).code,'SPATIAL_PIPE_UNCHECKED');
+assert.deepEqual(project,original,'Spatial status checks preserve original main pipe and planner data');
+
 console.log('Wall validation status: current geometry, dirty flags, stale point lists, physical changes and legacy modes PASS');

@@ -1,6 +1,6 @@
 // Independent camera for the wall workspace. Geometry and hit targets remain
 // in the drawing's base coordinates; only the SVG viewBox changes.
-export function createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange,onTap}) {
+export function createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange,onTap,onSingleDrag,enabled=()=>true}) {
   const camera={zoom:1,x:450,y:270,width:900,height:540};
   const pointers=new Map();
   let gesture=null,dragging=false,suppressClick=false,suppressUntil=0;
@@ -8,6 +8,7 @@ export function createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange,onTap
   let tapHandler=typeof onTap==='function'?onTap:null;
   const clamp=value=>Math.min(256,Math.max(1,value));
   const finite=value=>typeof value==='number'&&Number.isFinite(value);
+  const isEnabled=typeof enabled==='function'?()=>enabled()!==false:()=>true;
   function notify(){
     if(!changeHandler||notifying)return;
     const width=camera.width/camera.zoom,height=camera.height/camera.zoom;
@@ -17,9 +18,13 @@ export function createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange,onTap
   function apply(notifyChange=true){
     const width=camera.width/camera.zoom,height=camera.height/camera.zoom;
     svg.setAttribute('viewBox',`${camera.x-width/2} ${camera.y-height/2} ${width} ${height}`);
-    if(output)output.textContent=Math.round(camera.zoom*100)+'%';
-    if(zoomIn)zoomIn.disabled=camera.zoom>=256;
-    if(zoomOut)zoomOut.disabled=camera.zoom<=1;
+    // Multiple drawings may share one toolbar. Only the active camera owns
+    // its output and button states; hidden cameras may still redraw/reset.
+    if(isEnabled()){
+      if(output)output.textContent=Math.round(camera.zoom*100)+'%';
+      if(zoomIn)zoomIn.disabled=camera.zoom>=256;
+      if(zoomOut)zoomOut.disabled=camera.zoom<=1;
+    }
     if(notifyChange)notify();
   }
   // Account for the SVG's default xMidYMid meet letterboxing as well as CSS
@@ -45,20 +50,23 @@ export function createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange,onTap
   function reset(){camera.zoom=1;camera.x=camera.width/2;camera.y=camera.height/2;apply();}
   function capture(id){try{svg.setPointerCapture?.(id);}catch{}}
   function release(id){try{if(!svg.hasPointerCapture||svg.hasPointerCapture(id))svg.releasePointerCapture?.(id);}catch{}}
+  function cancelGesture(){const ids=[...pointers.keys()];pointers.clear();gesture=null;dragging=false;suppressClick=false;suppressUntil=0;for(const id of ids)release(id);}
   function markDragged(){dragging=true;suppressClick=true;suppressUntil=Date.now()+650;}
   function startPinch(){
     const[a,b]=[...pointers.values()],mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
     gesture={distance:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)),zoom:camera.zoom,anchor:point(mid.x,mid.y)};
     markDragged();for(const id of pointers.keys())capture(id);
   }
-  zoomIn?.addEventListener('click',()=>zoomTo(camera.zoom*1.35));
-  zoomOut?.addEventListener('click',()=>zoomTo(camera.zoom/1.35));
-  fit?.addEventListener('click',reset);
+  zoomIn?.addEventListener('click',()=>{if(isEnabled())zoomTo(camera.zoom*1.35);});
+  zoomOut?.addEventListener('click',()=>{if(isEnabled())zoomTo(camera.zoom/1.35);});
+  fit?.addEventListener('click',()=>{if(isEnabled())reset();});
   svg.addEventListener('wheel',event=>{
+    if(!isEnabled())return;
     if(!finite(event.clientX)||!finite(event.clientY)||!finite(event.deltaY))return;
     event.preventDefault();zoomTo(camera.zoom*Math.exp(-event.deltaY*.002),point(event.clientX,event.clientY));
   },{passive:false});
   svg.addEventListener('pointerdown',event=>{
+    if(!isEnabled()){cancelGesture();return;}
     if((event.button!==undefined&&event.button!==0)||!finite(event.clientX)||!finite(event.clientY))return;
     if(!pointers.size){dragging=false;gesture=null;suppressClick=false;}
     const pointerType=event.pointerType||'mouse',slop=pointerType==='touch'?12:pointerType==='pen'?8:5;
@@ -68,6 +76,7 @@ export function createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange,onTap
     if(pointers.size>=2){for(const entry of pointers.values())entry.multi=true;if(pointers.size===2)startPinch();}
   });
   svg.addEventListener('pointermove',event=>{
+    if(!isEnabled()){cancelGesture();return;}
     const entry=pointers.get(event.pointerId);if(!entry||!finite(event.clientX)||!finite(event.clientY))return;
     entry.x=event.clientX;entry.y=event.clientY;
     if(pointers.size===2&&gesture){
@@ -78,11 +87,17 @@ export function createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange,onTap
       markDragged();event.preventDefault();apply();
     }else if(pointers.size===1){
       if(!dragging&&Math.hypot(entry.x-entry.startX,entry.y-entry.startY)<=entry.slop)return;
-      capture(event.pointerId);const frame=screen();camera.x-=(entry.x-entry.lastX)/frame.scale;camera.y-=(entry.y-entry.lastY)/frame.scale;
+      capture(event.pointerId);
+      const deltaX=entry.x-entry.lastX,deltaY=entry.y-entry.lastY;
+      // A renderer may use a fresh one-pointer drag to orbit its 3D model.
+      // A remaining finger after a pinch continues panning, never orbiting.
+      const consumed=!entry.multi&&typeof onSingleDrag==='function'&&onSingleDrag({deltaX,deltaY,clientX:entry.x,clientY:entry.y,pointerType:entry.pointerType,event})===true;
+      if(!consumed){const frame=screen();camera.x-=deltaX/frame.scale;camera.y-=deltaY/frame.scale;}
       entry.lastX=entry.x;entry.lastY=entry.y;markDragged();event.preventDefault();apply();
     }
   });
   function endPointer(event){
+    if(!isEnabled()){cancelGesture();return;}
     const entry=pointers.get(event.pointerId);if(!entry)return;
     const clientX=finite(event.clientX)?event.clientX:entry.x,clientY=finite(event.clientY)?event.clientY:entry.y;
     const moved=Math.hypot(clientX-entry.startX,clientY-entry.startY)>entry.slop;
@@ -104,11 +119,12 @@ export function createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange,onTap
   const pointerHost=svg.ownerDocument?.defaultView??globalThis;
   for(const name of ['pointerup','pointercancel'])pointerHost.addEventListener?.(name,endPointer,true);
   svg.addEventListener('click',event=>{
+    if(!isEnabled()){cancelGesture();return;}
     // Keyboard activation has no pointer click count and must remain usable.
     if(suppressClick&&Date.now()<=suppressUntil&&event.detail!==0){event.preventDefault();event.stopImmediatePropagation?.();event.stopPropagation?.();suppressClick=false;}
   },true);
   svg.addEventListener('keydown',event=>{
-    if(event.target!==svg)return;
+    if(!isEnabled()||event.target!==svg)return;
     const step=45/camera.zoom;
     if(event.key==='+'||event.key==='=')zoomTo(camera.zoom*1.35);
     else if(event.key==='-'||event.key==='−')zoomTo(camera.zoom/1.35);

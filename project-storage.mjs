@@ -1,3 +1,4 @@
+import {hasSpatialPipe} from './spatial-geometry.mjs';
 // Stable project identity and independently stored wall working copies.
 // A working copy is separate from the pipe that has actually been applied.
 const PREFIX='pipe-bend-wall-draft-v2:';
@@ -19,11 +20,16 @@ function ordered(value){
  * ~1e-13 coordinate drift introduced when a metadata-only commit rebuilds it. */
 export function projectGeometryKey(project){
   const planner=project?.planner;
-  return JSON.stringify(ordered([project?.diameter,project?.radius,project?.lengths,project?.turns,project?.heading,project?.measurementMode??'tangent',project?.placement??null,planner?{version:planner.version,input:planner.input,routeEdited:!!planner.routeEdited,pipeEdited:!!planner.pipeEdited}:null]));
+  const parts=[project?.diameter,project?.radius,project?.lengths,project?.turns,project?.heading,project?.measurementMode??'tangent',project?.placement??null,planner?{version:planner.version,input:planner.input,routeEdited:!!planner.routeEdited,pipeEdited:!!planner.pipeEdited}:null];
+  // Do not change legacy fingerprints: private drafts created before spatial
+  // pipes must still match. Orientation is geometry when it is present.
+  if(project?.bendRotations!==undefined||project?.startFrame!==undefined)parts.push({bendRotations:project.bendRotations??null,startFrame:project.startFrame??null});
+  return JSON.stringify(ordered(parts));
 }
 export function projectOpenKey(project){return JSON.stringify([projectIdentity(project),projectGeometryKey(project)]);}
 
 function legacyMatches(project,key){
+  if(hasSpatialPipe(project))return false;
   try {
     const parts=JSON.parse(key);
     return Array.isArray(parts)&&parts.length===8&&sameData(parts.slice(2),[project?.diameter,project?.radius,project?.lengths,project?.turns,project?.heading,project?.planner]);

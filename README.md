@@ -112,3 +112,14 @@ Rediger rør i vægvisningen beregner rørføringen samlet, når en længde, buk
 Hvis beregningen ikke finder et kontrolleret resultat, bevares den seneste rørføring, og det ønskede mål vises som en ikke anvendt rettelse. Der loves ikke, at alle geometrisk mulige løsninger kan findes, og beregningen tilføjer ikke nye buk automatisk. Ændr eventuelt mål, endepunkter, klammer eller den tilladte vinkel, og prøv igen. Brug rørforslaget er blokeret, mens en ønsket rettelse ikke er opfyldt.
 
 Avanceret redigering af hjørnepunkternes X/Y-mål er også tilgængelig. Brug rørforslaget kontrollerer røret igen og erstatter først derefter det aktuelle rør; ændringen kan fortrydes. Vægforløbet og den rettede rørføring gemmes med projektet, og genåbning kontrollerer med de aktuelle dimensioner og klammer. Ældre rektangulære rumplaner bevarer deres vægge, klammer, forhindringer og rørføring ved konvertering til vægstykker. Ældre projekter uden måltype bliver ved med at bruge tangentlængder.
+
+
+### Buk op/ned og højder (v37)
+
+Rørredigeringen understøtter nu rumlige buk med venstre/højre, op/ned og frem/tilbage efter et lodret stykke. Vinkler og længder bruger samme radius og målereference som almindelige rør. Et valgfrit bukkeplan kan indtastes i grader. Alle højder har nul ved A.
+
+Visningen kan skiftes mellem den oprindelige rørtegning, ovenfra, forfra, fra siden og 3D-overblik, som kan drejes med mus eller én finger. Lodrette stykker får op/ned-symboler ovenfra. Overlappende lige stykker bevarer deres virkelige koordinater; skjulte dele vises stiplet og kan vælges ved tryk. Zoom gør rørdiameter og bukkurver mere detaljerede.
+
+Arbejdsvisning og SVG/PDF viser projektioner og højder samt en ekstra kolonne for drejning før hvert buk. Drejning er set A→B, positiv med uret; første reference vises ved A som 0°, øvrige drejninger følger det foregående buk. Værktøjstabellernes afsætningsmål og kaplængder bruger fortsat den dokumenterede metode.
+
+Projektformatversion 1 bevares med valgfrie `bendRotations` og `startFrame`; gamle projekter og måledata fungerer fortsat. Begge ender, redigering, Fortryd og JSON-overførsel bevarer rumlig geometri. Vægplanlæggeren er fortsat 2D: den kan ikke godkende højdeskift eller erstatte et rumligt rør med et 2D-forslag. Dens vægudkast kan stadig redigeres separat.

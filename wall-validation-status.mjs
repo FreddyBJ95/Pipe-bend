@@ -1,9 +1,10 @@
+import {hasSpatialPipe} from './spatial-geometry.mjs';
 // A worksheet/export must describe the current pipe, not merely the planner's
 // last saved point list. The explicit edited flag requires a new planner Apply.
 import {geometry} from './geometry.mjs';
 import {measurementMode,convertMeasurementMode} from './measurements.mjs';
-import {migrateRoomPlanner} from './room-planner.mjs?v=35';
-import {validateWallRoute} from './wall-routing.mjs?v=35';
+import {migrateRoomPlanner} from './room-planner.mjs?v=37';
+import {validateWallRoute} from './wall-routing.mjs?v=37';
 
 const finitePoint=point=>Array.isArray(point)&&point.length===2&&point.every(Number.isFinite);
 const messages={
@@ -15,6 +16,7 @@ const unchecked=code=>({status:'needs-check',checked:false,code,messageKey:messa
 
 export function wallValidationStatus(project) {
   if(!project?.planner)return {status:'none',checked:false,code:'NO_WALL_PLAN',messageKey:'',detailKey:''};
+  if(hasSpatialPipe(project))return {status:'needs-check',checked:false,code:'SPATIAL_PIPE_UNCHECKED',messageKey:'Vægkontrol: højdeskift ikke kontrolleret',detailKey:'Vægkontrollen gælder kun 2D. Rørets højdeskift er ikke kontrolleret mod vægge og forhindringer.'};
   try {
     const planner=migrateRoomPlanner(project.planner);
     if(!planner||planner.error||planner.savedError)return unchecked('SAVED_WALL_INVALID');

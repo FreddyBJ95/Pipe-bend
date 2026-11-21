@@ -186,4 +186,43 @@ const fitted=viewport.getState();assert.equal(viewport.fitBounds({x:0,y:0,width:
 assert.deepEqual(viewport.getState(),fitted,'Invalid group bounds preserve the camera');
 fit.emit('click');assert.equal(viewport.getState().zoom,1);
 
+// The ordinary and spatial canvases share a toolbar. Hidden cameras neither
+// consume those controls nor overwrite the active camera's zoom/button state.
+const sharedHost=new Element(),canvasA=new Element(),canvasB=new Element(),sharedIn=new Element(),sharedOut=new Element(),sharedFit=new Element(),sharedOutput=new Element();
+canvasA.ownerDocument=canvasB.ownerDocument={defaultView:sharedHost};
+let active='A';
+const cameraA=createWallViewport({svg:canvasA,zoomIn:sharedIn,zoomOut:sharedOut,fit:sharedFit,output:sharedOutput,enabled:()=>active==='A'});
+const cameraB=createWallViewport({svg:canvasB,zoomIn:sharedIn,zoomOut:sharedOut,fit:sharedFit,output:sharedOutput,enabled:()=>active==='B'});
+cameraA.update(800,400);cameraB.update(800,400);
+sharedIn.emit('click');near(cameraA.getState().zoom,1.35);near(cameraB.getState().zoom,1);assert.equal(sharedOutput.textContent,'135%');assert.equal(sharedOut.disabled,false);
+cameraB.reset();cameraB.update(800,400);assert.equal(sharedOutput.textContent,'135%');assert.equal(sharedOut.disabled,false,'A hidden reset cannot disable active zoom-out');
+const hiddenBefore=cameraB.getState();
+assert(!canvasB.emit('wheel',{clientX:410,clientY:220,deltaY:-400}).prevented,'Hidden wheel events are not consumed');
+assert(!canvasB.emit('keydown',{key:'+'}).prevented);canvasB.emit('keydown',{key:'ArrowLeft'});assert.deepEqual(cameraB.getState(),hiddenBefore);
+let inactiveTaps=0;cameraB.setOnTap(()=>{inactiveTaps++;return true;});
+canvasB.emit('pointerdown',{pointerId:501,clientX:210,clientY:220});canvasB.emit('pointerdown',{pointerId:502,clientX:410,clientY:220});canvasB.emit('pointermove',{pointerId:502,clientX:610,clientY:220});sharedHost.emit('pointerup',{pointerId:501,clientX:210,clientY:220});sharedHost.emit('pointerup',{pointerId:502,clientX:610,clientY:220});
+assert.equal(canvasB.captured.size,0);assert.equal(inactiveTaps,0);assert.deepEqual(cameraB.getState(),hiddenBefore);
+active='B';cameraB.update(800,400);assert.equal(sharedOutput.textContent,'100%');assert.equal(sharedOut.disabled,true);
+const savedA=cameraA.getState();sharedIn.emit('click');near(cameraB.getState().zoom,1.35);assert.deepEqual(cameraA.getState(),savedA,'Only the newly active camera receives shared zoom');
+cameraB.fitBounds({x:350,y:200,width:0,height:0});assert.equal(sharedIn.disabled,true);assert.equal(sharedOutput.textContent,'25600%');cameraA.update(800,400);assert.equal(sharedIn.disabled,true);assert.equal(sharedOutput.textContent,'25600%','Hidden redraws cannot overwrite a detailed active camera');
+sharedFit.emit('click');near(cameraB.getState().zoom,1);assert.deepEqual(cameraA.getState(),savedA,'Fit does not reset the hidden camera');
+// Switching canvases during an active pinch releases old captures and does
+// not turn the next single touch into a pinch or a stale selection.
+canvasB.emit('pointerdown',{pointerId:503,clientX:210,clientY:220});canvasB.emit('pointerdown',{pointerId:504,clientX:410,clientY:220});assert.equal(canvasB.captured.size,2);
+active='A';sharedHost.emit('pointerup',{pointerId:503,clientX:210,clientY:220});assert.equal(canvasB.captured.size,0);assert.equal(inactiveTaps,0);
+active='B';canvasB.emit('pointerdown',{pointerId:505,clientX:310,clientY:220});assert.equal(canvasB.captured.size,0);canvasB.emit('pointerup',{pointerId:505,clientX:310,clientY:220});assert.equal(inactiveTaps,1);
+
+// Optional 3D orbit consumes a single-pointer drag while retaining the
+// normal capture, cancellation and synthetic-click suppression lifecycle.
+const orbitSvg=new Element(),orbitHost=new Element();orbitSvg.ownerDocument={defaultView:orbitHost};
+let orbitEnabled=true,orbitTapCount=0;const dragEvents=[];
+const orbitCamera=createWallViewport({svg:orbitSvg,onTap:()=>{orbitTapCount++;return true;},onSingleDrag:drag=>{dragEvents.push({deltaX:drag.deltaX,deltaY:drag.deltaY,pointerType:drag.pointerType});return orbitEnabled;}});
+orbitCamera.update(800,400);const orbitStart=orbitCamera.getState();
+orbitSvg.emit('pointerdown',{pointerId:601,pointerType:'touch',clientX:210,clientY:120});orbitSvg.emit('pointermove',{pointerId:601,pointerType:'touch',clientX:215,clientY:122});assert.equal(dragEvents.length,0,'Tap jitter never orbits');
+const orbitMove=orbitSvg.emit('pointermove',{pointerId:601,pointerType:'touch',clientX:250,clientY:140});assert(orbitMove.prevented);assert(orbitSvg.captured.has(601));assert.deepEqual(orbitCamera.getState(),orbitStart,'Consumed orbit does not pan the SVG camera');assert.deepEqual(dragEvents.at(-1),{deltaX:40,deltaY:20,pointerType:'touch'});
+orbitSvg.emit('pointermove',{pointerId:601,pointerType:'touch',clientX:260,clientY:145});assert.deepEqual(dragEvents.at(-1),{deltaX:10,deltaY:5,pointerType:'touch'},'Orbit deltas advance after every consumed move');orbitHost.emit('pointerup',{pointerId:601,clientX:260,clientY:145});assert.equal(orbitTapCount,0);assert(orbitSvg.emit('click').prevented);assert.equal(orbitSvg.captured.size,0);
+orbitEnabled=false;orbitSvg.emit('pointerdown',{pointerId:602,clientX:210,clientY:120});orbitSvg.emit('pointermove',{pointerId:602,clientX:250,clientY:130});assert(orbitCamera.getState().x<orbitStart.x,'A false callback keeps ordinary pan');orbitHost.emit('pointerup',{pointerId:602,clientX:250,clientY:130});
+orbitCamera.reset();orbitEnabled=true;const beforePinchCalls=dragEvents.length;
+orbitSvg.emit('pointerdown',{pointerId:603,clientX:210,clientY:220});orbitSvg.emit('pointerdown',{pointerId:604,clientX:410,clientY:220});orbitSvg.emit('pointermove',{pointerId:604,clientX:610,clientY:220});near(orbitCamera.getState().zoom,2);assert.equal(dragEvents.length,beforePinchCalls,'Pinch still zooms without orbit');orbitHost.emit('pointerup',{pointerId:603,clientX:210,clientY:220});const remainingBefore=orbitCamera.getState();orbitSvg.emit('pointermove',{pointerId:604,clientX:630,clientY:220});assert.equal(dragEvents.length,beforePinchCalls,'A remaining pinch finger cannot unexpectedly orbit');assert(orbitCamera.getState().x<remainingBefore.x);orbitHost.emit('pointerup',{pointerId:604,clientX:630,clientY:220});assert.equal(orbitTapCount,0);
+
 console.log('Wall viewport detail zoom, callbacks, pan, pinch, pointer cleanup, redraw, keyboard and fit tests passed.');

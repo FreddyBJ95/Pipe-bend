@@ -85,4 +85,21 @@ for(const pair of [true,[],{requested:90,used:90},{requested:90,used:0},{request
  assert.ok(normalizeWallDraft({...fallbackDraft,pipeDetourNotice:pair}).error,'Malformed or mismatched angle context must not enter a portable draft');
 }
 
+// Spatial orientation is part of source geometry, while all old fingerprints
+// stay byte-for-byte compatible with their existing private draft records.
+const expectedLegacyKey=JSON.stringify([12,38,[1000],[],0,'vertex',null,{input:{wall:{heading:0,lengths:[2400],side:'left',turns:[]}},pipeEdited:false,routeEdited:false,version:2}]);
+assert.equal(projectGeometryKey(project),expectedLegacyKey);
+const flatPipe={...project,lengths:[1000,500],turns:[90]},raisedPipe={...flatPipe,bendRotations:[90]},framedPipe={...flatPipe,startFrame:{tangent:[1,0,0],normal:[0,0,1]}};
+for(const oriented of [raisedPipe,framedPipe,{...flatPipe,bendRotations:[0]}])assert.notEqual(projectGeometryKey(oriented),projectGeometryKey(flatPipe));
+assert.equal(projectGeometryKey({...raisedPipe,name:'Height route renamed'}),projectGeometryKey(raisedPipe));
+const spatialDB=storage();writeWallDraft(flatPipe,planner,spatialDB);
+assert.equal(readWallDraft(raisedPipe,spatialDB),null,'A prior applied XY copy must not mask a height-changing pipe');
+writeWallDraft(raisedPipe,draft,spatialDB);
+assert.deepEqual(readWallDraft({...raisedPipe,bendRotations:[-90]},spatialDB),draft,'Independent measured walls survive spatial pipe edits without replacing the main pipe');
+const spatialLegacy=storage(),spatialLegacyKey=JSON.stringify([flatPipe.name,flatPipe.drawingNumber,flatPipe.diameter,flatPipe.radius,flatPipe.lengths,flatPipe.turns,flatPipe.heading,flatPipe.planner]);
+spatialLegacy.setItem('pipe-bend-wall-draft-v1',JSON.stringify({projectKey:spatialLegacyKey,planner:draft}));
+assert.equal(readWallDraft(raisedPipe,spatialLegacy),null,'A 2D legacy draft must not silently claim an otherwise matching spatial pipe');
+assert.ok(spatialLegacy.getItem('pipe-bend-wall-draft-v1'),'Spatial migration guard preserves the sole legacy copy');
+const orientationBefore=JSON.stringify(raisedPipe);projectGeometryKey(raisedPipe);readWallDraft(raisedPipe,spatialDB);assert.equal(JSON.stringify(raisedPipe),orientationBefore);
+
 console.log('Project draft storage: stable identity, rename safety, independent copies, legacy migration, tombstones and atomic writes PASS');

@@ -1,14 +1,15 @@
-import {generateWallRoute,validateWallRoute,wallLayout,pointOnWall,wallObstaclePolygon} from './wall-routing.mjs?v=35';
-import {layoutLocalWallLabels,wallSegmentFootprint,wallDirectionArrow} from './wall-label-layout.mjs?v=35';
-import {rectPolygon} from './dimension-layout.mjs?v=35';
-import {pipeModelFromPoints} from './wall-pipe-edit.mjs?v=35';
-import {solveWallPipeEdit} from './wall-pipe-solver.mjs?v=35';
-import {buildRouteGeometry} from './room-routing.mjs?v=35';
-import {createWallViewport} from './wall-viewport.mjs?v=35';
-import {geometryToSvgPath,getWallClearanceDimensions} from './wall-detail-geometry.mjs?v=35';
-import {pickPipePart,pickWallSegment} from './wall-picking.mjs?v=35';
-import {setIconButton} from './ui-icons.mjs?v=35';
-import {projectIdentity,projectOpenKey,readWallDraft,writeWallDraft,clearWallDraft} from './project-storage.mjs?v=35';
+import {hasSpatialPipe} from './spatial-geometry.mjs';
+import {generateWallRoute,validateWallRoute,wallLayout,pointOnWall,wallObstaclePolygon} from './wall-routing.mjs?v=37';
+import {layoutLocalWallLabels,wallSegmentFootprint,wallDirectionArrow} from './wall-label-layout.mjs?v=37';
+import {rectPolygon} from './dimension-layout.mjs?v=37';
+import {pipeModelFromPoints} from './wall-pipe-edit.mjs?v=37';
+import {solveWallPipeEdit} from './wall-pipe-solver.mjs?v=37';
+import {buildRouteGeometry} from './room-routing.mjs?v=37';
+import {createWallViewport} from './wall-viewport.mjs?v=37';
+import {geometryToSvgPath,getWallClearanceDimensions} from './wall-detail-geometry.mjs?v=37';
+import {pickPipePart,pickWallSegment} from './wall-picking.mjs?v=37';
+import {setIconButton} from './ui-icons.mjs?v=37';
+import {projectIdentity,projectOpenKey,readWallDraft,writeWallDraft,clearWallDraft} from './project-storage.mjs?v=37';
 
 const words={
   title:['Tegn vægforløb','Tegn veggforløp','Draw the wall path'],
@@ -61,6 +62,7 @@ const words={
   wallLegend:['Væg','Vegg','Wall'],clipLegend:['Klamme','Klammer','Clip'],obstacleLegend:['Forhindring','Hindring','Obstacle'],routeLegend:['Kontrolleret rør','Kontrollert rør','Validated pipe'],pipeSide:['Rørside','Rørside','Pipe side'],
   legacy:['Din tidligere rumplan er åbnet som fire vægstykker. Mål, placeringer og rørforslag er bevaret. Du kan nu redigere vægstykkerne.','Den tidligere romplanen er åpnet som fire veggstykker. Mål, plasseringer og rørforslag er beholdt. Du kan nå redigere veggstykkene.','Your previous room plan is open as four wall segments. Dimensions, placements and the pipe route are preserved. You can now edit the wall segments.'],
   invalidSaved:['De gemte vægdata kunne ikke åbnes. Det eksisterende rør er bevaret. Kontrollér vægforløbet og lav et nyt forslag.','De lagrede veggdataene kunne ikke åpnes. Det eksisterende røret er beholdt. Kontroller veggforløpet og lag et nytt forslag.','The saved wall data could not be opened. The existing pipe is preserved. Check the wall path and generate a new proposal.'],
+  spatialBoundary:['Vægudkastet er 2D. Røret med højdeskift bevares og kan ikke kontrolleres eller erstattes her. Opret et nyt rør, hvis du vil bruge vægforslaget.','Veggutkastet er 2D. Røret med høydeforskjeller beholdes og kan ikke kontrolleres eller erstattes her. Opprett et nytt rør hvis du vil bruke veggforslaget.','The wall draft is 2D. The pipe with height changes is preserved and cannot be checked or replaced here. Create a new pipe to use the wall proposal.'],
   noWalls:['Tilføj et vægstykke først.','Legg til et veggstykke først.','Add a wall segment first.'],
 };
 const clone=value=>JSON.parse(JSON.stringify(value));
@@ -269,7 +271,8 @@ export function initRoomPlanner({getProject,onApply,language}) {
   const advanced=el('details',{id:'rp-advanced',class:'rp-advanced'});advanced.append(translated('summary','advanced'));routeEditor.append(advanced);
   const tableWrap=el('div',{class:'rp-table-wrap'}),table=el('table'),thead=el('thead'),headerRow=el('tr');headerRow.append(translated('th','point'),el('th',{},'X · mm'),el('th',{},'Y · mm'),el('th',{},''));thead.append(headerRow);table.append(thead,el('tbody',{id:'rp-points'}));tableWrap.append(table);advanced.append(tableWrap);
   const editActions=el('div',{class:'rp-edit-actions'});editActions.append(button('addPoint',addPoint,{id:'rp-add-point'}),button('validate',validate,{id:'rp-validate'}));advanced.append(editActions);visual.append(routeEditor);columns.append(settings,visual);form.append(columns);
-  const legacyNotice=translated('p','legacy',{id:'rp-legacy',class:'rp-legacy',hidden:''}),status=el('p',{id:'rp-status',class:'rp-status',role:'status','aria-live':'polite'}),error=el('p',{id:'rp-error',class:'rp-error',role:'alert'}),actions=el('div',{class:'rp-actions'});actions.append(button('apply',apply,{id:'rp-apply',class:'primary',disabled:''}));dialog.append(heading,legacyNotice,form,status,error,actions);document.body.append(dialog);
+  const spatialNotice=translated('p','spatialBoundary',{id:'rp-spatial-notice',class:'rp-legacy',role:'status',hidden:''});
+  const legacyNotice=translated('p','legacy',{id:'rp-legacy',class:'rp-legacy',hidden:''}),status=el('p',{id:'rp-status',class:'rp-status',role:'status','aria-live':'polite'}),error=el('p',{id:'rp-error',class:'rp-error',role:'alert'}),actions=el('div',{class:'rp-actions'});actions.append(button('apply',apply,{id:'rp-apply',class:'primary',disabled:''}));dialog.append(heading,spatialNotice,legacyNotice,form,status,error,actions);document.body.append(dialog);
   form.addEventListener('input',onFormInput);form.addEventListener('change',event=>{if(event.target.tagName==='SELECT')onFormInput(event);});
   function onFormInput(event){
     const target=event.target;if(target.closest('#rp-wall-builder'))return;
@@ -353,7 +356,7 @@ export function initRoomPlanner({getProject,onApply,language}) {
   }
   function accept(next){
     if(!next?.ok){clearDetourNotice();result=null;q('rp-apply').disabled=true;showError(roomPlannerError(next,languageValue()));status.textContent='';renderPoints();pipeFeedback(false,error.textContent);draw();persistDraft();return false;}
-    result=next;draftPoints=clone(next.points);numericPipeInvalid=false;q('rp-apply').disabled=false;showError('');status.textContent=tr('validated');status.hidden=true;q('rp-summary').textContent=next.turns.length+' '+tr('bends')+' · '+tr('length')+': '+format(next.geometricLength)+' mm';lastSafe=pipeSnapshot();renderPoints();pipeFeedback(true,tr('validated'));draw();persistDraft();return true;
+    result=next;draftPoints=clone(next.points);numericPipeInvalid=false;q('rp-apply').disabled=hasSpatialPipe(getProject());showError('');status.textContent=tr('validated');status.hidden=true;q('rp-summary').textContent=next.turns.length+' '+tr('bends')+' · '+tr('length')+': '+format(next.geometricLength)+' mm';lastSafe=pipeSnapshot();renderPoints();pipeFeedback(true,tr('validated'));draw();persistDraft();return true;
   }
   function pipeSnapshot(){return{points:clone(draftPoints),start:clone(input().start),end:clone(input().end),selected:selectedPipe?{...selectedPipe}:null,adjustments:clone(autoAdjustments),manual:manualPipe,detourContext:detourNoticePair()?clone(detourNoticeContext):null};}
   function writeAnchor(key,data){fillSegmentSelect(q('rp-'+key+'-wall'),data.segment);setNumericField(q('rp-'+key+'-position'),data.position);}
@@ -439,10 +442,10 @@ export function initRoomPlanner({getProject,onApply,language}) {
   }
 
   function addPoint(){if(draftPoints.length<2||pendingPipeEdit||!validPipeFields())return;rememberPipe();clearDetourNotice();autoAdjustments=[];readPoints();const a=draftPoints.at(-2),b=draftPoints.at(-1);draftPoints.splice(draftPoints.length-1,0,[(a[0]+b[0])/2,(a[1]+b[1])/2]);manualPipe=true;numericPipeInvalid=false;result=null;q('rp-apply').disabled=true;showError('');status.textContent=tr('edited');status.hidden=false;renderPoints();pipeFeedback(false,tr('edited'));draw();persistDraft();}
-  async function apply(){if(!result?.ok||numericPipeInvalid||!validSettings()||!validPipeFields())return;try{readPoints();const data=input(),checked=validateWallRoute(data,draftPoints);if(!accept(checked))return;q('rp-apply').disabled=true;await onApply({lengths:clone(checked.lengths),turns:clone(checked.turns),heading:checked.heading,start:clone(checked.start),planner:{version:2,input:clone(data),points:clone(checked.points),pipeEdited:manualPipe,...(detourNoticePair()?{pipeDetourNotice:detourNoticePair()}:{})}});dialog.close();}catch(exception){showError(exception?.message||tr('rejected'));q('rp-apply').disabled=!result?.ok;}}
+  async function apply(){if(hasSpatialPipe(getProject())){q('rp-apply').disabled=true;showError(tr('spatialBoundary'));return;}if(!result?.ok||numericPipeInvalid||!validSettings()||!validPipeFields())return;try{readPoints();const data=input(),checked=validateWallRoute(data,draftPoints);if(!accept(checked))return;q('rp-apply').disabled=true;await onApply({lengths:clone(checked.lengths),turns:clone(checked.turns),heading:checked.heading,start:clone(checked.start),planner:{version:2,input:clone(data),points:clone(checked.points),pipeEdited:manualPipe,...(detourNoticePair()?{pipeDetourNotice:detourNoticePair()}:{})}});dialog.close();}catch(exception){showError(exception?.message||tr('rejected'));q('rp-apply').disabled=hasSpatialPipe(getProject())||!result?.ok;}}
   function format(n){return Number(n).toLocaleString({da:'da-DK',nb:'nb-NO',en:'en-GB'}[languageValue()]||'da-DK',{maximumFractionDigits:1});}
   function updateAngleHelp(){renderDetourNotice();const limit=value('rp-max-angle');q('rp-angle-hint').textContent=wallBendAngleHint(limit,languageValue());q('rp-allow-90').hidden=!Number.isFinite(limit)||limit<=0||limit>=90;}
-  function refresh(){updateAngleHelp();settingsTabs.setAttribute('aria-label',tr('settingsTabs'));for(const node of dialog.querySelectorAll('[data-rp-icon-label]'))setIconButton(node,node.dataset.rpIconName,tr(node.dataset.rpIconLabel));for(const node of dialog.querySelectorAll('[data-rp-text]')){const key=node.dataset.rpText;if(node.tagName==='LABEL'){const first=node.firstChild;if(first?.nodeType===3)first.nodeValue=tr(key);else node.prepend(document.createTextNode(tr(key)));}else node.textContent=tr(key);}const p=getProject();q('rp-tool-summary').textContent=tr('diameter')+': '+format(p.diameter)+' mm · '+tr('radius')+': '+format(p.radius)+' mm';if(opened){renderWallRows();updateSegmentChoices();renderPipeFields();}markPlacementRows();renderAdjustments();if(pendingPipeEdit){showError(pendingMessage());pipeFeedback(false,pendingMessage());}if(dialog.open)draw();}
+  function refresh(){updateAngleHelp();settingsTabs.setAttribute('aria-label',tr('settingsTabs'));for(const node of dialog.querySelectorAll('[data-rp-icon-label]'))setIconButton(node,node.dataset.rpIconName,tr(node.dataset.rpIconLabel));for(const node of dialog.querySelectorAll('[data-rp-text]')){const key=node.dataset.rpText;if(node.tagName==='LABEL'){const first=node.firstChild;if(first?.nodeType===3)first.nodeValue=tr(key);else node.prepend(document.createTextNode(tr(key)));}else node.textContent=tr(key);}const p=getProject();spatialNotice.hidden=!hasSpatialPipe(p);if(!spatialNotice.hidden)q('rp-apply').disabled=true;q('rp-tool-summary').textContent=tr('diameter')+': '+format(p.diameter)+' mm · '+tr('radius')+': '+format(p.radius)+' mm';if(opened){renderWallRows();updateSegmentChoices();renderPipeFields();}markPlacementRows();renderAdjustments();if(pendingPipeEdit){showError(pendingMessage());pipeFeedback(false,pendingMessage());}if(dialog.open)draw();}
   function defaultInput(){return defaultWallPlanInput();}
   function open(){
     let savedIssue=false;const active=document.activeElement;if(!dialog.open)returnFocus=active?.closest('#app-menu')?document.querySelector('#app-menu > summary'):active;const key=fingerprint(),reuse=opened&&key===projectKey;
