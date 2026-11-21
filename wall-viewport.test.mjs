@@ -18,7 +18,7 @@ class Element {
   hasPointerCapture(id){return this.captured.has(id);}
   releasePointerCapture(id){this.captured.delete(id);}
   emit(type,extra={}){
-    const event={target:this,detail:1,button:0,
+    const event={type,target:this,detail:1,button:0,
       preventDefault(){this.prevented=true;},
       stopPropagation(){this.stopped=true;},
       stopImmediatePropagation(){this.immediate=true;},...extra};
@@ -143,5 +143,47 @@ const deferred=[];
 const other=createWallViewport({svg:new Element(),onChange:state=>deferred.push(state.zoom)});
 assert.equal(deferred.length,0,'A constructor callback waits until construction completes');
 other.update(500,300);assert.deepEqual(deferred,[1]);
+
+// A finger can move slightly while tapping a thin vertical pipe. Keep the
+// intended down point, tolerate touch jitter, and consume its synthetic click.
+viewport.reset();viewport.update(800,400);
+const taps=[];viewport.setOnTap(tap=>{taps.push(tap);return true;});
+old=viewport.getState();const intended=viewport.clientPoint(410,220),tapTarget={part:'vertical'};
+svg.emit('pointerdown',{pointerId:90,pointerType:'touch',clientX:410,clientY:220,target:tapTarget});
+svg.emit('pointermove',{pointerId:90,pointerType:'touch',clientX:418,clientY:226});
+assert.deepEqual(viewport.getState(),old,'10px finger jitter stays a tap');
+host.emit('pointerup',{pointerId:90,pointerType:'touch',clientX:418,clientY:226});
+assert.equal(taps.length,1);assert.equal(taps[0].target,tapTarget);assert.equal(taps[0].pointerType,'touch');
+near(taps[0].point.x,intended.x);near(taps[0].point.y,intended.y);
+assert(svg.emit('click').prevented,'A geometric tap must select exactly once');
+assert(!svg.emit('click',{detail:0}).prevented,'A geometric tap does not block keyboard activation');
+svg.emit('pointerdown',{pointerId:91,pointerType:'touch',clientX:410,clientY:220});
+svg.emit('pointermove',{pointerId:91,pointerType:'touch',clientX:410,clientY:250});
+host.emit('pointerup',{pointerId:91,pointerType:'touch',clientX:410,clientY:250});
+assert.equal(taps.length,1,'A real vertical drag never selects');
+svg.emit('pointerdown',{pointerId:92,pointerType:'touch',clientX:410,clientY:220});
+host.emit('pointercancel',{pointerId:92,pointerType:'touch',clientX:410,clientY:220});
+assert.equal(taps.length,1,'Cancelled pointers never select');
+svg.emit('pointerdown',{pointerId:93,pointerType:'touch',clientX:11,clientY:220});
+host.emit('pointerup',{pointerId:93,pointerType:'touch',clientX:9,clientY:220});
+assert.equal(taps.length,1,'Releasing outside the SVG never selects');
+svg.emit('pointerdown',{pointerId:94,pointerType:'touch',clientX:310,clientY:220});
+svg.emit('pointerdown',{pointerId:95,pointerType:'touch',clientX:510,clientY:220});
+svg.emit('pointerup',{pointerId:94});svg.emit('pointerup',{pointerId:95});
+assert.equal(taps.length,1,'Two-finger gestures never become a tap');
+viewport.setOnTap(()=>false);
+svg.emit('pointerdown',{pointerId:96,clientX:410,clientY:220});svg.emit('pointerup',{pointerId:96});
+assert(!svg.emit('click').prevented,'Annotation actions may keep their ordinary click');
+viewport.setOnTap(null);
+
+// A grouped wall reference focuses its actual geometry in one camera update.
+viewport.reset();viewport.update(800,400);
+assert.equal(viewport.fitBounds({minX:300,minY:150,maxX:400,maxY:250}),true);
+near(viewport.getState().x,350);near(viewport.getState().y,200);near(viewport.getState().zoom,3.2);
+assert.equal(viewport.fitBounds({x:350,y:200,width:0,height:0}),true);
+assert.equal(viewport.getState().zoom,256);
+const fitted=viewport.getState();assert.equal(viewport.fitBounds({x:0,y:0,width:-1,height:1}),false);
+assert.deepEqual(viewport.getState(),fitted,'Invalid group bounds preserve the camera');
+fit.emit('click');assert.equal(viewport.getState().zoom,1);
 
 console.log('Wall viewport detail zoom, callbacks, pan, pinch, pointer cleanup, redraw, keyboard and fit tests passed.');

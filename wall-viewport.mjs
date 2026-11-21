@@ -1,10 +1,11 @@
 // Independent camera for the wall workspace. Geometry and hit targets remain
 // in the drawing's base coordinates; only the SVG viewBox changes.
-export function createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange}) {
+export function createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange,onTap}) {
   const camera={zoom:1,x:450,y:270,width:900,height:540};
   const pointers=new Map();
   let gesture=null,dragging=false,suppressClick=false,suppressUntil=0;
   let changeHandler=typeof onChange==='function'?onChange:null,notifying=false;
+  let tapHandler=typeof onTap==='function'?onTap:null;
   const clamp=value=>Math.min(256,Math.max(1,value));
   const finite=value=>typeof value==='number'&&Number.isFinite(value);
   function notify(){
@@ -60,10 +61,11 @@ export function createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange}) {
   svg.addEventListener('pointerdown',event=>{
     if((event.button!==undefined&&event.button!==0)||!finite(event.clientX)||!finite(event.clientY))return;
     if(!pointers.size){dragging=false;gesture=null;suppressClick=false;}
-    pointers.set(event.pointerId,{x:event.clientX,y:event.clientY,startX:event.clientX,startY:event.clientY,lastX:event.clientX,lastY:event.clientY});
+    const pointerType=event.pointerType||'mouse',slop=pointerType==='touch'?12:pointerType==='pen'?8:5;
+    pointers.set(event.pointerId,{x:event.clientX,y:event.clientY,startX:event.clientX,startY:event.clientY,lastX:event.clientX,lastY:event.clientY,pointerType,slop,target:event.target,multi:false});
     // Delay capture for a single pointer: capturing on a pipe hit target would
     // otherwise retarget an ordinary tap away from that target's click action.
-    if(pointers.size===2)startPinch();
+    if(pointers.size>=2){for(const entry of pointers.values())entry.multi=true;if(pointers.size===2)startPinch();}
   });
   svg.addEventListener('pointermove',event=>{
     const entry=pointers.get(event.pointerId);if(!entry||!finite(event.clientX)||!finite(event.clientY))return;
@@ -75,16 +77,26 @@ export function createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange}) {
       if(camera.zoom===1){camera.x=camera.width/2;camera.y=camera.height/2;}
       markDragged();event.preventDefault();apply();
     }else if(pointers.size===1){
-      if(!dragging&&Math.hypot(entry.x-entry.startX,entry.y-entry.startY)<=5)return;
+      if(!dragging&&Math.hypot(entry.x-entry.startX,entry.y-entry.startY)<=entry.slop)return;
       capture(event.pointerId);const frame=screen();camera.x-=(entry.x-entry.lastX)/frame.scale;camera.y-=(entry.y-entry.lastY)/frame.scale;
       entry.lastX=entry.x;entry.lastY=entry.y;markDragged();event.preventDefault();apply();
     }
   });
   function endPointer(event){
-    if(!pointers.has(event.pointerId))return;
+    const entry=pointers.get(event.pointerId);if(!entry)return;
+    const clientX=finite(event.clientX)?event.clientX:entry.x,clientY=finite(event.clientY)?event.clientY:entry.y;
+    const moved=Math.hypot(clientX-entry.startX,clientY-entry.startY)>entry.slop;
+    const tap=event.type==='pointerup'&&pointers.size===1&&!entry.multi&&!dragging&&!moved;
     pointers.delete(event.pointerId);release(event.pointerId);gesture=null;
-    if(dragging){suppressClick=true;suppressUntil=Date.now()+650;}
+    if(dragging||moved){suppressClick=true;suppressUntil=Date.now()+650;}
     if(pointers.size===1){const entry=pointers.values().next().value;entry.startX=entry.lastX=entry.x;entry.startY=entry.lastY=entry.y;}
+    if(tap&&tapHandler){
+      const bounds=svg.getBoundingClientRect?.();
+      const inside=!bounds||(clientX>=bounds.left&&clientX<=bounds.left+bounds.width&&clientY>=bounds.top&&clientY<=bounds.top+bounds.height);
+      if(inside&&tapHandler({point:point(entry.startX,entry.startY),clientX:entry.startX,clientY:entry.startY,pointerType:entry.pointerType,target:entry.target,event})===true){
+        suppressClick=true;suppressUntil=Date.now()+650;event.preventDefault?.();
+      }
+    }
   }
   for(const name of ['pointerup','pointercancel','lostpointercapture'])svg.addEventListener(name,endPointer);
   // A tap is deliberately not captured, so its release can happen outside
@@ -113,8 +125,19 @@ export function createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange}) {
     apply();
   }
   function setOnChange(handler){changeHandler=typeof handler==='function'?handler:null;notify();}
+  function setOnTap(handler){tapHandler=typeof handler==='function'?handler:null;}
+  function fitBounds(bounds,paddingPixels=40){
+    if(!bounds||!finite(paddingPixels)||paddingPixels<0)return false;
+    const x=bounds.x??bounds.minX,y=bounds.y??bounds.minY;
+    const width=bounds.width??bounds.maxX-x,height=bounds.height??bounds.maxY-y;
+    if(![x,y,width,height].every(finite)||width<0||height<0)return false;
+    const baseDensity=screen().scale/camera.zoom;
+    const padding=Math.min(paddingPixels/baseDensity,camera.width/4,camera.height/4);
+    camera.zoom=clamp(Math.min((camera.width-2*padding)/Math.max(width,1/baseDensity),(camera.height-2*padding)/Math.max(height,1/baseDensity)));
+    camera.x=x+width/2;camera.y=y+height/2;apply();return true;
+  }
   // Renderers may reference the returned camera in their callback. Avoid a
   // constructor callback before that reference can be assigned.
   apply(false);
-  return{update,reset,getState:()=>({...camera}),clientPoint:point,setOnChange};
+  return{update,reset,getState:()=>({...camera}),clientPoint:point,setOnChange,setOnTap,fitBounds};
 }
