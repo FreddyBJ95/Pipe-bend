@@ -1,6 +1,6 @@
-import {spatialLayerSelection} from './spatial-layers.mjs?v=39';
-import {createWallViewport} from './wall-viewport.mjs?v=39';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=39';
+import {spatialLayerSelection} from './spatial-layers.mjs?v=40';
+import {createWallViewport} from './wall-viewport.mjs?v=40';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=40';
 
 const NS='http://www.w3.org/2000/svg',EPS=1e-8;
 const finite=n=>typeof n==='number'&&Number.isFinite(n);
@@ -230,7 +230,7 @@ function paintTube(frame,group,pixelsPerUnit=1,preview=null){
  for(const [i,entry]of visibility.entries())for(const interval of entry.hidden){node(svg,'path',{'data-spatial-hidden':'L'+(i+1),d:polyline(interval.map(t=>mix(projected.lines[i].start,projected.lines[i].end,t)),P),fill:'none',stroke:'#426b63','stroke-width':1.5,'vector-effect':'non-scaling-stroke','stroke-dasharray':'4 4'},group);}
 }
 
-function paintAnnotations(frame,group,camera,{format=String,translate=s=>s,onEdit=()=>{},onEndpoint=()=>{},interactive=true}={}){
+function paintAnnotations(frame,group,camera,{format=String,translate=s=>s,onEdit=()=>{},onEndpoint=()=>{},onJoint=()=>{},interactive=true}={}){
  const {svg,geometry:g,settings,projected,P,scale}=frame,density=camera.pixelsPerUnit||1,width=camera.screenWidth||camera.width,height=camera.screenHeight||camera.height;
  const toScreen=p=>[(p[0]-camera.x)*density+width/2,(p[1]-camera.y)*density+height/2],project=p=>toScreen(P(p));
  const topLeft=[camera.x-width/2/density,camera.y-height/2/density];group.setAttribute('transform',`translate(${topLeft[0]} ${topLeft[1]}) scale(${1/density})`);
@@ -312,6 +312,7 @@ function paintAnnotations(frame,group,camera,{format=String,translate=s=>s,onEdi
   node(svg,'circle',{cx:p[0]+offset,cy:p[1],r:22,fill:'transparent'},endpoint);node(svg,'circle',{cx:p[0]+offset,cy:p[1],r:15,fill:letter===settings.end?'#16815d':'#183c36',stroke:'#fff','stroke-width':2.5},endpoint);node(svg,'text',{x:p[0]+offset,y:p[1]+4.5,'text-anchor':'middle',fill:'#fff','font-size':13,'font-weight':700},endpoint,letter);
   if(interactive){endpoint.setAttribute('role','button');endpoint.setAttribute('tabindex','0');endpoint.onclick=event=>{event.stopPropagation?.();onEndpoint(letter);};endpoint.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onEndpoint(letter);}};}
  }
+ for(const joint of settings.joints||[]){if(settings.layerSelection&&!settings.layerSelection.lines[joint.lineIndex])continue;const line=g.lines[joint.lineIndex];if(!line)continue;const fraction=joint.distance/line.length,point=project(mix(line.start,line.end,fraction));if(!inView(point,width,height,28))continue;const marker=node(svg,'g',{'data-joint':joint.id,'data-focus-key':'joint:'+joint.id,class:'joint-marker','aria-label':joint.id+' · L'+(joint.lineIndex+1)+' · '+format(joint.distance)+' mm'},labels);node(svg,'path',{d:`M ${point[0]-8} ${point[1]-8} L ${point[0]+8} ${point[1]+8} M ${point[0]-8} ${point[1]+8} L ${point[0]+8} ${point[1]-8}`},marker);node(svg,'circle',{cx:point[0]+18,cy:point[1]-18,r:11},marker);node(svg,'text',{x:point[0]+18,y:point[1]-14,'text-anchor':'middle','font-size':11},marker,joint.id);node(svg,'title',{},marker,marker.getAttribute('aria-label'));if(interactive){marker.setAttribute('role','button');marker.setAttribute('tabindex','0');marker.onclick=event=>{event.stopPropagation?.();onJoint(joint.sourceIndex);};marker.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onJoint(joint.sourceIndex);}};}}
  // The first bend's0° datum is physically anchored at A and projected
  // from its actual reference normal, including a tilted/prepended start.
  if(startReference){
@@ -334,7 +335,7 @@ function paintAnnotations(frame,group,camera,{format=String,translate=s=>s,onEdi
 }
 
 /** Separate SVG from the planar editor: hidden views do not share a camera. */
-export function createSpatialPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=String,translate=s=>s,onEdit=()=>{},onEndpoint=()=>{},onPick,onSelect}={}){
+export function createSpatialPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=String,translate=s=>s,onEdit=()=>{},onEndpoint=()=>{},onJoint=()=>{},onPick,onSelect}={}){
  let frame=null,lastView=null,orbitMode=false;
  const orbit={yaw:Math.PI/4,pitch:Math.atan(1/Math.SQRT2)};
  const viewport=createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange:update,onTap:tap,onSingleDrag:orbitDrag,enabled:()=>!svg.hasAttribute('hidden')});
@@ -357,7 +358,7 @@ export function createSpatialPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=S
   const bounds=svg.getBoundingClientRect?.(),screenWidth=Number(bounds?.width)||camera.width,screenHeight=Number(bounds?.height)||camera.height;
   const focused=svg.ownerDocument.activeElement,focusKey=frame.annotations.contains?.(focused)?focused?.getAttribute?.('data-focus-key'):null;
   frame.pipes.replaceChildren();paintTube(frame,frame.pipes,camera.pixelsPerUnit,frame.preview);
-  frame.annotations.replaceChildren();paintAnnotations(frame,frame.annotations,{...camera,screenWidth,screenHeight},{format,translate,onEdit,onEndpoint});
+  frame.annotations.replaceChildren();paintAnnotations(frame,frame.annotations,{...camera,screenWidth,screenHeight},{format,translate,onEdit,onEndpoint,onJoint});
   svg.setAttribute('data-detail-zoom',String(camera.zoom));svg.setAttribute('data-world-diameter',String(frame.settings.diameter));svg.setAttribute('data-world-scale',String(frame.scale));
   if(focusKey){const next=[...frame.annotations.querySelectorAll('[data-focus-key]')].find(item=>item.getAttribute('data-focus-key')===focusKey);(next||svg).focus?.({preventScroll:true});}
  }
@@ -406,12 +407,12 @@ function installWorkSelection(svg,frame,{labelMode,onSelect}){
 /** A single large workshop view preserves the old drawing's visual hierarchy.
  * Other projections are chosen explicitly, rather than compressed beside it.
  * Geometry stays exact; the overview line weight is deliberately legible. */
-export function renderSpatialWorkDrawing(svg,geometry,{diameter=12,radius=38,format=String,translate=s=>s,view='iso',layerHeight=null,labelMode='all',selected=null,onSelect,width=900,height=1200}={}){
+export function renderSpatialWorkDrawing(svg,geometry,{diameter=12,radius=38,format=String,translate=s=>s,view='iso',layerHeight=null,labelMode='all',selected=null,joints=[],onSelect,width=900,height=1200}={}){
  const layerSelection=view==='top'?spatialLayerSelection(geometry,layerHeight):null,focused=svg.ownerDocument.activeElement,focusId=svg.contains?.(focused)?focused?.getAttribute?.('data-spatial-selectable'):null;
  svg.replaceChildren();svg.removeAttribute('data-inline-bends');svg.removeAttribute('data-total-bends');svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.setAttribute('data-spatial-work','true');svg.setAttribute('data-spatial-work-view',view);svg.setAttribute('data-spatial-work-layer',layerSelection?String(layerSelection.height):'all');
  const title=translate(view==='top'?'Ovenfra':view==='front'?'Forfra':view==='side'?'Fra siden':'3D-overblik');
  node(svg,'text',{'data-work-view-title':'',x:30,y:38,'font-family':'var(--app-font, sans-serif)','font-size':22,'font-weight':600,fill:'#183c36'},svg,title+(layerSelection?' · H '+signedHeight(layerSelection.height,format)+' mm':''));
- const frame=layoutFrame(svg,geometry,{diameter,radius,view,end:'B',annotationScale:1.5,overviewStroke:10,compactOverview:true,layerSelection,labelMode,selected},width,height-56);
+ const frame=layoutFrame(svg,geometry,{diameter,radius,view,end:'B',annotationScale:1.5,overviewStroke:10,compactOverview:true,layerSelection,labelMode,selected,joints},width,height-56);
  frame.P=((original)=>p=>{const q=original(p);return[q[0],q[1]+56,q[2]];})(frame.P);
  const pipe=node(svg,'g',{'data-work-view':view}),annotations=node(svg,'g',{'data-work-view-annotations':view});paintTube(frame,pipe,1);paintAnnotations(frame,annotations,{x:width/2,y:height/2,width,height,pixelsPerUnit:1},{format,translate,interactive:false});installWorkSelection(svg,frame,{labelMode,onSelect});
  if(focusId){const focus=[...svg.querySelectorAll('[data-spatial-selectable]')].find(part=>part.getAttribute('data-spatial-selectable')===focusId);focus?.focus?.({preventScroll:true});}

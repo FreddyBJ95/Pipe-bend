@@ -1,8 +1,8 @@
-import {createWallViewport} from './wall-viewport.mjs?v=39';
-import {mainPipeToSvgPath,pipeDetailStrokeWidths} from './main-pipe-detail.mjs?v=39';
-import {layoutMainDetailAnnotations} from './main-detail-annotations.mjs?v=39';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=39';
-import {referenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=39';
+import {createWallViewport} from './wall-viewport.mjs?v=40';
+import {mainPipeToSvgPath,pipeDetailStrokeWidths} from './main-pipe-detail.mjs?v=40';
+import {layoutMainDetailAnnotations} from './main-detail-annotations.mjs?v=40';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=40';
+import {referenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=40';
 
 const NS='http://www.w3.org/2000/svg';
 const rect=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
@@ -23,7 +23,7 @@ function visibleLine(a,b,width,height,padding=24){
 
 /** The ordinary editor's camera changes physical geometry and screen labels
  * independently. A pan/zoom never rebuilds the tube or changes project data. */
-export function createMainPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=String,translate=s=>s,onEdit=()=>{},onEndpoint=()=>{}}){
+export function createMainPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=String,translate=s=>s,onEdit=()=>{},onEndpoint=()=>{},onJoint=()=>{}}){
  let frame=null;
  const viewport=createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange:update,enabled:()=>!svg.hasAttribute('hidden')});
  function node(tag,attrs,parent,text){const item=document.createElementNS(NS,tag);for(const [key,value]of Object.entries(attrs||{}))item.setAttribute(key,String(value));if(text!==undefined)item.textContent=text;(parent||svg).append(item);return item;}
@@ -77,6 +77,7 @@ export function createMainPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=Stri
    node('rect',{x:ref.labelX-ref.width/2,y:ref.labelY-ref.height/2,width:ref.width,height:ref.height,rx:ref.height/2,fill:'#fff4e8',stroke:'#ae5c15','stroke-width':1},badge);node('text',{x:ref.labelX,y:ref.labelY+ref.fontSize*.34,'font-family':'var(--app-font, sans-serif)','font-size':ref.fontSize,'font-weight':600,'text-anchor':'middle',fill:'#994c0c'},badge,ref.id);node('title',{},badge,ref.id+' · '+format(Math.abs(g.arcs[ref.index].turn))+'°');editable(badge,'angle',ref.index);
   }
   for(const ref of anchors){const anchor=node('g',{'data-bend-id':ref.id,'data-bend-anchor':ref.id,'data-focus-key':'anchor:'+ref.id,class:'bend-anchor','aria-label':ref.id+' · '+format(Math.abs(g.arcs[ref.index].turn))+'°'},labels);node('circle',{cx:ref.x,cy:ref.y,r:12,fill:'transparent'},anchor);node('circle',{'data-bend':ref.id,cx:ref.x,cy:ref.y,r:2.5,fill:'#ae5c15',stroke:'#fff','stroke-width':1},anchor);editable(anchor,'angle',ref.index);}
+  for(const joint of settings.joints||[]){const line=g.lines[joint.lineIndex];if(!line)continue;const fraction=joint.distance/line.length,world=line.start.map((value,index)=>value+(line.end[index]-value)*fraction),point=project(world);if(!inView(point,28))continue;const marker=node('g',{'data-joint':joint.id,'data-focus-key':'joint:'+joint.id,class:'joint-marker',role:'button',tabindex:0,'aria-label':joint.id+' · L'+(joint.lineIndex+1)+' · '+format(joint.distance)+' mm'},labels);node('path',{d:`M ${point[0]-8} ${point[1]-8} L ${point[0]+8} ${point[1]+8} M ${point[0]-8} ${point[1]+8} L ${point[0]+8} ${point[1]-8}`},marker);node('circle',{cx:point[0]+18,cy:point[1]-18,r:11},marker);node('text',{x:point[0]+18,y:point[1]-14,'text-anchor':'middle','font-size':11},marker,joint.id);node('title',{},marker,marker.getAttribute('aria-label'));marker.onclick=()=>onJoint(joint.sourceIndex);marker.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onJoint(joint.sourceIndex);}};}
   const detail=layoutMainDetailAnnotations({geometry:g,radius:settings.radius,diameter:settings.diameter,pixelsPerMm:scale*density,zoom:state.zoom,mapPoint:project,width,height,obstacles:[...obstacles,...placed.map(dim=>dim.polygon)],format});
   for(const dimension of detail.dimensions){
    const group=node('g',{'data-detail-dimension':dimension.kind,'data-detail-value':dimension.value,'pointer-events':'none'},guides);

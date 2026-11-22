@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import {spatialLayerSelection} from './spatial-layers.mjs?v=39';
-import {geometry3D} from './spatial-geometry.mjs?v=39';
-import {projectSpatialPoint,projectSpatialGeometry,spatialArcSamples,spatialLineVisibility,pickSpatialParts,spatialRiseLabelData,classifySpatialProjection} from './spatial-drawing.mjs?v=39';
+import {spatialLayerSelection} from './spatial-layers.mjs?v=40';
+import {geometry3D} from './spatial-geometry.mjs?v=40';
+import {projectSpatialPoint,projectSpatialGeometry,spatialArcSamples,spatialLineVisibility,pickSpatialParts,spatialRiseLabelData,classifySpatialProjection} from './spatial-drawing.mjs?v=40';
 
 const close=(a,b,epsilon=1e-7)=>assert(Math.abs(a-b)<=epsilon,`${a} != ${b}`);
 assert.deepEqual(projectSpatialPoint([12,34,56],'top'),[12,34,56]);

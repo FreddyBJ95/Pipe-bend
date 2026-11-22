@@ -8,7 +8,7 @@ Dette dokument er skrevet til den næste Codex-agent. Læs også `README.md`, og
 
 Brugeren ønsker nu at arbejde med hele projektet lokalt på sin computer og lade sin egen Codex-agent overtage. Denne overdragelse er særskilt godkendt til at blive lagt på Git. Fortsæt lokalt; udgiv ikke nye appændringer automatisk uden brugerens ønske. Slet ikke det eksisterende repository eller den offentlige app.
 
-Kodegrundlaget ved overdragelsen er **v39**, commit `19736e04721954c20f369375019bbda0a1c2bdd1`. Seneste appudgivelse er kontrolleret som gennemført. Dette dokument ændrer ingen appfunktioner.
+Kodegrundlaget er **v40**, videreført fra commit `852bfe9`. Version 40 tilføjer samlinger og flere fysiske rør. Den offentlige app udgives fra `main` gennem det eksisterende GitHub Actions-workflow.
 
 - Repository: https://github.com/FreddyBJ95/Pipe-bend
 - Offentlig app: https://freddybj95.github.io/Pipe-bend/
@@ -29,6 +29,8 @@ Kodegrundlaget ved overdragelsen er **v39**, commit `19736e04721954c20f369375019
 9. Ovenfra kan arbejdsvisningen vælge alle højder eller et bestemt **lag**. Overliggende rør skjuler dermed ikke et valgt lavere lag. L/B-numre og verdenskoordinater bevares. Op/ned-symboler viser forbindelser til andre højder.
 10. De rumlige visninger har **Mål: Alle mål / Ved tryk**. Ved tryk vises kun det valgte rørs længde eller bukkets vinkel og højde. Tomt tryk skjuler data igen. I redigeringen kan den viste markering trykkes igen for at rette målet. Træk i 3D drejer modellen uden samtidig at vælge et mål.
 11. Venstre/højre og de øvrige retningssymboler står samlet i én vandret række. På meget smalle skærme ruller rækken sidelæns; trykfladerne er fortsat 44 px.
+12. Et sammenhængende træk kan opdeles i fysiske rør R1, R2 … med samlinger S1, S2 … på lige stykker. Samlinger kan placeres manuelt eller foreslås ud fra rå rørlængde, værktøjstabellens kaplængde og en brugerdefineret mindste afstand til buk. Tillæg før/efter samlingen understøtter indstik og overlap.
+13. Arbejdsvisningen viser hvert fysisk rør lagt fladt med lokale B-mærker, kædemål og samlet kaplængde. Printdialogen kan medtage eller fravælge forside, rørdata, fysiske rør, afsætningsmål, referencelister, flade rør og geometriske bukkedata. Printvalget gemmes lokalt og er ikke en del af projektfilen.
 
 De tre seneste brugerønsker om retningsrækken, lag og mål ved tryk er allerede implementeret og udgivet. Genimplementér dem ikke blot, fordi de er gentaget i samtalehistorikken. Hvis noget fortsat fejler, undersøg den konkrete kørsel, synlighed og indlæste version.
 
@@ -52,6 +54,7 @@ De tre seneste brugerønsker om retningsrækken, lag og mål ved tryk er allered
 | `measurements.mjs` | Målemetoder, tangentfradrag, validering og værktøjets afsætningsmål. |
 | `benders.mjs` | Dokumenterede værktøjsprofiler og producentens tabelværdier. |
 | `displayed-marks.mjs` | Afrunder absolutte mærker én gang og beregner synlige delmål som differencer. |
+| `material-sections.mjs` | Validerer samlinger, opdeler trækket i fysiske rør, beregner lokale bukkemærker og foreslår samlinger efter rå rørlængde. |
 | `spatial-geometry.mjs` | Rumlige linjer/cirkelbuer, startframe, bukkeplaner og fysisk drejning. |
 | `spatial-drawing.mjs` | Projektion, synlige/skjulte dele, relevante mål, lag, 3D-rotation og trykvalg. |
 | `spatial-layers.mjs` | Finder faktiske konstante højder og masker med de oprindelige L/B-indekser. |
@@ -136,7 +139,7 @@ Den eksisterende Del appen/QR-kode peger fortsat på den offentlige app. Lokale 
 
 ## Test og faktisk valideringsniveau
 
-Der er **27** selvstændige Node-testsæt ved overdragelsen. De bestod ved v39 sammen med syntakskontrol af JavaScript og kontrol af alle **53** offlineaktiver.
+Der er **28** selvstændige Node-testsæt i den lokale v40-arbejdskopi. De består sammen med syntakskontrol af JavaScript og kontrol af alle **54** offlineaktiver.
 
 Kør fra projektets rod:
 
@@ -174,7 +177,7 @@ Den eksisterende GitHub Pages-konfiguration kan stadig bruges, men lokal udvikli
 - Udgiv kun efter en relevant bestilling fra brugeren.
 - Bevar relative stier; appen skal virke både lokalt og under `/Pipe-bend/`.
 - Koordinér versionsquery i HTML/importer og `sw.js`-cache. Nye/ændrede runtime-moduler skal være i offlineaktivlisten med den præcise importsti.
-- De nuværende cache/importversioner er v39. En dokumentationsændring alene behøver ikke en ny appversion.
+- Cache- og importversionerne er v40. Bevar versionsnummeret samlet i HTML, importer og `sw.js` ved senere appændringer.
 - Bevar eksisterende ændringer, undgå force-push, og kontrollér deployment-resultatet, før du melder en ændring udgivet.
 
 ## Anbefalet første skridt for den næste agent
@@ -182,4 +185,4 @@ Den eksisterende GitHub Pages-konfiguration kan stadig bruges, men lokal udvikli
 1. Læs dette dokument og kontrollér projektmappen, dens instruktioner og ændringer.
 2. Start den lokale app og behold den samme lokale adresse fremover.
 3. Kør relevante tests; hvis du arbejder på UI, test også den faktiske synlighed og interaktion i en browser, når en browser er tilgængelig.
-4. Spørg, hvilken konkret opgave brugeren vil tage som den næste. Der er ingen uafsluttet implementering af de tre seneste v39-ønsker.
+4. Version 40 er implementeret, testet og bestilt udgivet af brugeren. Kontrollér den aktuelle Git- og deploymentstatus, før næste ændring.
