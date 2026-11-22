@@ -19,6 +19,12 @@ Upload indholdet af denne mappe, **inklusive `.github`**, til roden af dit repos
 
 Appen installeres fra den HTTPS-adresse, GitHub Pages giver dig; en downloadet ZIP alene er ikke en installeret PWA.
 
+## Mindre samlingsmarkør og tydeligere buk (v44)
+
+I live-tegningen tilpasser samlingsmarkøren sig nu zoomniveauet. Ved 100 % vises en lille delelinje med den kompakte tekst `S1`; når der zoomes ind, vokser markøren gradvist og viser igen `S1 · DELING`. Det usynlige trykområde er fortsat 44 × 44 px, så samlingen er lige så nem at vælge. Arbejdstegning og udskrift bruger altid den fulde markør.
+
+I arbejdstegningen fremhæves selve den præcise bukkebue med en diskret, bredere flade i bukkets farvekode. Dermed kan bukkets form ses direkte på røret, også når et langt rør får den normale bue til at fylde få pixels. Fremhævningen følger samme geometriske bue og ændrer hverken radius, tangentpunkter eller mål.
+
 ## Farvede buk direkte på røret (v43)
 
 Standardbuk på 30°/45°/60°/90° farver nu hele den fysiske bue på rørtegningen i henholdsvis violet, blå, gul og mørkegrøn. De tidligere store vinkelbokse er fjernet for standardbuk; kun et lille ubokset B-nummer bliver stående, mens fuld vinkel og retning fortsat findes i referencelister og bukkedata.

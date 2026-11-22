@@ -1,24 +1,24 @@
-import {initAppSharing} from './share-app.mjs?v=43';
+import {initAppSharing} from './share-app.mjs?v=44';
 import {SWAGELOK_BENDERS,getBender} from './benders.mjs';
 import {measurementMode,validateMeasurements,convertMeasurementMode,bendMarkLayout} from './measurements.mjs';
-import {roundDisplayedMarks} from './displayed-marks.mjs?v=43';
-import {isProjectId} from './project-storage.mjs?v=43';
-import {initRoomPlanner} from './room-planner.mjs?v=43';
+import {roundDisplayedMarks} from './displayed-marks.mjs?v=44';
+import {isProjectId} from './project-storage.mjs?v=44';
+import {initRoomPlanner} from './room-planner.mjs?v=44';
 import {renderOffsetVisualization} from './offset-visual.mjs';
-import {initTypography} from './typography.mjs?v=43';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=43';
-import {layoutBlankMarks} from './blank-layout.mjs?v=43';
-import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=43';
-import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=43';
+import {initTypography} from './typography.mjs?v=44';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=44';
+import {layoutBlankMarks} from './blank-layout.mjs?v=44';
+import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=44';
+import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=44';
 import{geometry,extend,triangle,practicalOffsetLength,calculate}from'./geometry.mjs';
-import {wallValidationStatus} from './wall-validation-status.mjs?v=43';
-import {createMainPipeDrawing} from './main-pipe-drawing.mjs?v=43';
-import {geometry3D,extendSpatial,validateSpatialState,hasSpatialPipe,bendOrientation,spatialBendRotations} from './spatial-geometry.mjs?v=43';
-import {spatialHeightLayers} from './spatial-layers.mjs?v=43';
-import {createSpatialPipeDrawing,renderSpatialWorkDrawing} from './spatial-drawing.mjs?v=43';
-import {setIconButton} from './ui-icons.mjs?v=43';
-import {materialPlan,suggestMaterialJoints,validateMaterialJoints,jointPoint,pieceLayoutMarks,pieceWorkProject} from './material-sections.mjs?v=43';
-import {bendVisual,bendBadgeLines,bendAccessibleLabel} from './bend-visuals.mjs?v=43';
+import {wallValidationStatus} from './wall-validation-status.mjs?v=44';
+import {createMainPipeDrawing} from './main-pipe-drawing.mjs?v=44';
+import {geometry3D,extendSpatial,validateSpatialState,hasSpatialPipe,bendOrientation,spatialBendRotations} from './spatial-geometry.mjs?v=44';
+import {spatialHeightLayers} from './spatial-layers.mjs?v=44';
+import {createSpatialPipeDrawing,renderSpatialWorkDrawing} from './spatial-drawing.mjs?v=44';
+import {setIconButton} from './ui-icons.mjs?v=44';
+import {materialPlan,suggestMaterialJoints,validateMaterialJoints,jointPoint,pieceLayoutMarks,pieceWorkProject} from './material-sections.mjs?v=44';
+import {bendVisual,bendBadgeLines,bendAccessibleLabel} from './bend-visuals.mjs?v=44';
 const $=id=>document.getElementById(id),fmt=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:getBender(state.benderId)?.nativeUnits==='in'?3:1}):'—',fmtAngle=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:3}):'—';
 function newDrawingNumber(){const d=new Date(),date=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('');return 'PB-'+date+'-'+crypto.randomUUID().slice(0,6).toUpperCase();}
 function normalizeProject(s){const name=s.name.trim()||t('Mit første rør');return {...s,projectId:isProjectId(s.projectId)?s.projectId:crypto.randomUUID(),name,configured:s.configured!==false,drawingNumber:s.drawingNumber?.trim()||name,jointClearance:s.jointClearance??50,joints:s.joints??[]};}
@@ -226,7 +226,7 @@ function draw(g,preview,target=$('drawing'),work=false,options={}){
  if(preview){let shift=[0,0];if(end==='A'){const p=preview.lines[1].start;shift=[-p[0],-p[1]];}path(preview,{stroke:'#97c6b0','stroke-width':2,'stroke-dasharray':'8 8',opacity:.6},shift);}
  path(g,{stroke:'#9db6ab','stroke-width':14});path(g,{stroke:'#deeee7','stroke-width':9});path(g,{stroke:'#487b69','stroke-width':1,'stroke-dasharray':'4 5'});
  for(const [index,arc]of g.arcs.entries()){
-	 const visual=bendVisual(arc.turn),id=arc.displayId||'B'+(index+1),accessible=bendAccessibleLabel(id,arc.turn,{format:fmtAngle,special:t('SPECIAL')}),points=arc.samples.map(P),d=points.map((point,i)=>(i?'L':'M')+point.join(' ')).join(' '),outer=el('path',{'data-bend-color':visual.key,'data-bend-kind':visual.standard?'standard':'special','data-bend-id':id,'aria-label':accessible,d,fill:'none',stroke:visual.stroke,'stroke-width':14,'stroke-linecap':'butt','stroke-linejoin':'round','pointer-events':'none'},pipes);el('title',{},outer).textContent=accessible;el('path',{d,fill:'none',stroke:visual.tube,'stroke-width':9,'stroke-linecap':'butt','stroke-linejoin':'round','pointer-events':'none'},pipes);el('path',{d,fill:'none',stroke:visual.stroke,'stroke-width':1,'stroke-dasharray':visual.dash||'4 5','stroke-linecap':'butt','pointer-events':'none'},pipes);
+	 const visual=bendVisual(arc.turn),id=arc.displayId||'B'+(index+1),accessible=bendAccessibleLabel(id,arc.turn,{format:fmtAngle,special:t('SPECIAL')}),points=arc.samples.map(P),d=points.map((point,i)=>(i?'L':'M')+point.join(' ')).join(' ');if(work)el('path',{'data-bend-emphasis':id,d,fill:'none',stroke:visual.stroke,'stroke-width':22,'stroke-linecap':'round','stroke-linejoin':'round',opacity:.26,'pointer-events':'none'},pipes);const outer=el('path',{'data-bend-color':visual.key,'data-bend-kind':visual.standard?'standard':'special','data-bend-id':id,'aria-label':accessible,d,fill:'none',stroke:visual.stroke,'stroke-width':14,'stroke-linecap':'butt','stroke-linejoin':'round','pointer-events':'none'},pipes);el('title',{},outer).textContent=accessible;el('path',{d,fill:'none',stroke:visual.tube,'stroke-width':9,'stroke-linecap':'butt','stroke-linejoin':'round','pointer-events':'none'},pipes);el('path',{d,fill:'none',stroke:visual.stroke,'stroke-width':1,'stroke-dasharray':visual.dash||'4 5','stroke-linecap':'butt','pointer-events':'none'},pipes);
  }
  if(!work)for(let index=0;index<g.lines.length;index++){const a=P(g.lines[index].start),b=P(g.lines[index].end);el('line',{'data-length-id':'L'+(index+1),class:'reference-path',x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:'#278f70','stroke-width':20,'stroke-linecap':'round','pointer-events':'none',opacity:0},pipes);}
  const rect=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];

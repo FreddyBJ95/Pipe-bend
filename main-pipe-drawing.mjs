@@ -1,9 +1,10 @@
-import {createWallViewport} from './wall-viewport.mjs?v=43';
-import {mainPipeToSvgPath,pipeDetailStrokeWidths} from './main-pipe-detail.mjs?v=43';
-import {layoutMainDetailAnnotations} from './main-detail-annotations.mjs?v=43';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=43';
-import {referenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=43';
-import {bendVisual,bendBadgeLines,bendAccessibleLabel} from './bend-visuals.mjs?v=43';
+import {createWallViewport} from './wall-viewport.mjs?v=44';
+import {mainPipeToSvgPath,pipeDetailStrokeWidths} from './main-pipe-detail.mjs?v=44';
+import {layoutMainDetailAnnotations} from './main-detail-annotations.mjs?v=44';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=44';
+import {referenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=44';
+import {bendVisual,bendBadgeLines,bendAccessibleLabel} from './bend-visuals.mjs?v=44';
+import {jointMarkerPresentation} from './joint-visuals.mjs?v=44';
 
 const NS='http://www.w3.org/2000/svg';
 const rect=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
@@ -87,10 +88,10 @@ export function createMainPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=Stri
   for(const [jointIndex,joint]of (settings.joints||[]).entries()){
    const line=g.lines[joint.lineIndex];if(!line)continue;
    const fraction=joint.distance/line.length,world=line.start.map((value,index)=>value+(line.end[index]-value)*fraction),point=project(world);if(!inView(point,72))continue;
-   const a=project(line.start),b=project(line.end),length=Math.hypot(b[0]-a[0],b[1]-a[1])||1,u=[(b[0]-a[0])/length,(b[1]-a[1])/length],n=[-u[1],u[0]],text=joint.workLabel||joint.id+' · '+translate('DELING'),pillWidth=Math.max(96,text.length*7+20),side=point[0]>width*.58?-1:1,lane=joint.workLane??jointIndex,laneOffset=(lane%2?-1:1)*(30+Math.floor(lane/2)*28),labelX=Math.max(pillWidth/2+8,Math.min(width-pillWidth/2-8,point[0]+side*(pillWidth/2+26))),labelY=Math.max(18,Math.min(height-18,point[1]-laneOffset)),accessible=text+' · L'+(joint.lineIndex+1)+' · '+format(joint.distance)+' mm',marker=node('g',{'data-joint':joint.id,'data-focus-key':'joint:'+joint.id,class:'joint-marker joint-division-marker',role:'button',tabindex:0,'aria-label':accessible},labels);
+	  const a=project(line.start),b=project(line.end),length=Math.hypot(b[0]-a[0],b[1]-a[1])||1,u=[(b[0]-a[0])/length,(b[1]-a[1])/length],n=[-u[1],u[0]],presentation=jointMarkerPresentation(state.zoom),fullText=joint.workLabel||joint.id+' · '+translate('DELING'),text=presentation.compact?joint.id:fullText,pillHeight=presentation.compact?20:26,pillWidth=Math.max(presentation.compact?36:96,text.length*(presentation.compact?6:7)+(presentation.compact?14:20)),side=point[0]>width*.58?-1:1,lane=joint.workLane??jointIndex,laneOffset=(lane%2?-1:1)*((presentation.compact?21:30)+Math.floor(lane/2)*(presentation.compact?20:28)),labelX=Math.max(pillWidth/2+8,Math.min(width-pillWidth/2-8,point[0]+side*(pillWidth/2+(presentation.compact?14:26)))),labelY=Math.max(pillHeight/2+5,Math.min(height-pillHeight/2-5,point[1]-laneOffset)),accessible=fullText+' · L'+(joint.lineIndex+1)+' · '+format(joint.distance)+' mm',marker=node('g',{'data-joint':joint.id,'data-focus-key':'joint:'+joint.id,'data-joint-visual-scale':presentation.scale,'data-joint-label-mode':presentation.compact?'compact':'full',class:'joint-marker joint-division-marker',role:'button',tabindex:0,'aria-label':accessible},labels);
    node('rect',{x:point[0]-22,y:point[1]-22,width:44,height:44,fill:'transparent','pointer-events':'all'},marker);
-   for(const offset of [-4,4]){const center=[point[0]+u[0]*offset,point[1]+u[1]*offset];node('line',{x1:center[0]-n[0]*24,y1:center[1]-n[1]*24,x2:center[0]+n[0]*24,y2:center[1]+n[1]*24,stroke:'#fff','stroke-width':7,'stroke-linecap':'round'},marker);node('line',{'data-division-symbol':'cut-band',x1:center[0]-n[0]*24,y1:center[1]-n[1]*24,x2:center[0]+n[0]*24,y2:center[1]+n[1]*24,stroke:'#A73622','stroke-width':3,'stroke-linecap':'round'},marker);}
-   node('line',{x1:point[0],y1:point[1],x2:labelX-side*pillWidth/2,y2:labelY,stroke:'#A73622','stroke-width':1.5,'stroke-dasharray':'4 3'},marker);node('rect',{x:labelX-pillWidth/2,y:labelY-13,width:pillWidth,height:26,rx:13,fill:'#FFF0EB',stroke:'#A73622','stroke-width':1.7},marker);node('text',{x:labelX,y:labelY+4,'text-anchor':'middle','font-size':11,'font-weight':700,fill:'#702315'},marker,text);node('title',{},marker,accessible);
+	  const symbol=node('g',{'data-joint-visible-symbol':'','transform':`translate(${point[0]} ${point[1]}) scale(${presentation.scale}) translate(${-point[0]} ${-point[1]})`},marker);for(const offset of [-4,4]){const center=[point[0]+u[0]*offset,point[1]+u[1]*offset];node('line',{x1:center[0]-n[0]*24,y1:center[1]-n[1]*24,x2:center[0]+n[0]*24,y2:center[1]+n[1]*24,stroke:'#fff','stroke-width':7,'stroke-linecap':'round'},symbol);node('line',{'data-division-symbol':'cut-band',x1:center[0]-n[0]*24,y1:center[1]-n[1]*24,x2:center[0]+n[0]*24,y2:center[1]+n[1]*24,stroke:'#A73622','stroke-width':3,'stroke-linecap':'round'},symbol);}
+	  node('line',{x1:point[0],y1:point[1],x2:labelX-side*pillWidth/2,y2:labelY,stroke:'#A73622','stroke-width':presentation.compact?1.2:1.5,'stroke-dasharray':'4 3'},marker);node('rect',{x:labelX-pillWidth/2,y:labelY-pillHeight/2,width:pillWidth,height:pillHeight,rx:pillHeight/2,fill:'#FFF0EB',stroke:'#A73622','stroke-width':presentation.compact?1.3:1.7},marker);node('text',{x:labelX,y:labelY+(presentation.compact?3.3:4),'text-anchor':'middle','font-size':presentation.compact?9.5:11,'font-weight':700,fill:'#702315'},marker,text);node('title',{},marker,accessible);
    marker.onclick=()=>onJoint(joint.sourceIndex);marker.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onJoint(joint.sourceIndex);}};
   }
   const detail=layoutMainDetailAnnotations({geometry:g,radius:settings.radius,diameter:settings.diameter,pixelsPerMm:scale*density,zoom:state.zoom,mapPoint:project,width,height,obstacles:[...obstacles,...placed.map(dim=>dim.polygon)],format});

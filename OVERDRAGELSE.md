@@ -8,7 +8,7 @@ Dette dokument er skrevet til den næste Codex-agent. Læs også `README.md`, og
 
 Brugeren ønsker nu at arbejde med hele projektet lokalt på sin computer og lade sin egen Codex-agent overtage. Denne overdragelse er særskilt godkendt til at blive lagt på Git. Fortsæt lokalt; udgiv ikke nye appændringer automatisk uden brugerens ønske. Slet ikke det eksisterende repository eller den offentlige app.
 
-Den aktuelle udgave er **v43**, videreført fra v42-commit `e38581e`. Version 43 farver hele rørbuen ved standardbuk og fjerner de store vinkelbokse for 30°/45°/60°/90°; et lille B-nummer og de fulde reference-/bukkedata bevares. Ikke-standard vinkler beholder en tydelig `SPECIAL`-label. Brugeren bad den 22. november 2026 om at få v43 committed og udgivet fra `main` gennem GitHub Pages-workflowet.
+Den aktuelle udgave er **v44**, videreført fra v43-commit `6560436`. Version 44 gør samlingsmarkøren mindre ved oversigtszoom og fremhæver selve den farvede bukkebue i arbejdstegningen. Brugeren bad den 22. november 2026 om at få v44 committed og udgivet fra `main` gennem GitHub Pages-workflowet; kontrollér altid den konkrete Pages-kørsel, før udgivelsen meldes færdig.
 
 - Repository: https://github.com/FreddyBJ95/Pipe-bend
 - Offentlig app: https://freddybj95.github.io/Pipe-bend/
@@ -32,9 +32,10 @@ Den aktuelle udgave er **v43**, videreført fra v42-commit `e38581e`. Version 43
 12. Et sammenhængende træk kan opdeles i fysiske rør R1, R2 … med samlinger S1, S2 … på lige stykker. Samlinger kan placeres manuelt eller foreslås ud fra rå rørlængde, værktøjstabellens kaplængde og en brugerdefineret mindste afstand til buk. Tillæg før/efter samlingen understøtter indstik og overlap.
 13. Arbejdsvisningen viser et samlet montageoverblik og derefter én A4-lignende arbejdstegning pr. fysisk rør. Hver R-side har lokal formtegning med de oprindelige L/B-numre, kaplængde/tillæg og et udfoldet rør med mål fra kapenden. S1/S2 vises ved den egentlige delelinje; ved overlap/indstik ligger S inde på røret, og `K` viser den fysiske kapende. Rumlige R-sider bruger lokale højder og drejninger fra den overførte reference ved R-start.
 14. Printdialogen kan særskilt medtage eller fravælge montageoverblik, R-arbejdstegninger, rørdata, fysiske rør, afsætningsmål, referencelister, en ekstra detaljeret fladoversigt og geometriske bukkedata. Det ekstra flade bilag er fravalgt som standard, fordi R-siderne allerede indeholder den flade tegning. Printvalget gemmes lokalt og er ikke en del af projektfilen.
-15. Samlinger bruger samme tydelige dobbeltlinje og `S… · DELING`-label i live 2D, rumlige projektioner, arbejdsvisning og print. End-on vises som ring/kryds. 3D-markøren beregnes fra den projicerede linje; brug ikke original XYZ direkte i skærmprojektøren.
+15. Samlinger bruger samme tydelige dobbeltlinje i live 2D, rumlige projektioner, arbejdsvisning og print. Liveoversigten viser en kompakt `S…`-label, som bliver til `S… · DELING` ved tæt zoom; arbejdsvisning og print viser altid den fulde label. End-on vises som ring/kryds. 3D-markøren beregnes fra den projicerede linje; brug ikke original XYZ direkte i skærmprojektøren.
 16. Buk på 30°/45°/60°/90° er henholdsvis violet/blå/gul-okker/mørkegrøn. Andre vinkler er bordeaux og mærket `SPECIAL`; graden bevares altid som tekst i reference- og bukkedata. Visningsvalget `Rørtegning` er omdøbt til `Automatisk 2D`, fordi det er en automatisk drejet plantilpasning og ikke den faste Ovenfra-projektion.
 17. Fra v43 bæres standardkoden af hele den farvede rørbue. Store B/vinkelbokse vises ikke længere for standardbuk; kun et lille ubokset B-nummer står ved buen. Den præcise grad findes fortsat i referencelister, fladtegninger og tabeller. `SPECIAL` har fortsat en eksplicit tekstlabel, og et valgt standardbuk kan vise detaljekortet i `Ved tryk`-tilstand.
+18. Fra v44 skalerer den synlige samlingsmarkør i live 2D og 3D fra 40 % ved 100 % zoom til fuld størrelse ved 250 % zoom. I oversigten står kun `S1`; tættere på står `S1 · DELING`. Det transparente 44 × 44 px trykområde ændres ikke, og arbejdsvisning/print beholder fuld størrelse. Arbejdstegningens fysiske bukkebue får desuden en diskret farvet fremhævning langs nøjagtig samme SVG-bane, så formen ses tydeligt uden at ændre geometri eller mål.
 
 De tre seneste brugerønsker om retningsrækken, lag og mål ved tryk er allerede implementeret og udgivet. Genimplementér dem ikke blot, fordi de er gentaget i samtalehistorikken. Hvis noget fortsat fejler, undersøg den konkrete kørsel, synlighed og indlæste version.
 
@@ -65,6 +66,7 @@ De tre seneste brugerønsker om retningsrækken, lag og mål ved tryk er allered
 | `main-pipe-drawing.mjs`, `main-pipe-detail.mjs` | Den oprindelige rørtegning med præcise buer og zoomdetaljer. |
 | `labels.mjs`, `dimension-layout.mjs`, `main-detail-annotations.mjs` | Placering af lokale referencer og læsbare mål. |
 | `bend-visuals.mjs` | Fælles, afledt farve- og labelmodel for 30°/45°/60°/90° samt ikke-standard `SPECIAL`-buk. |
+| `joint-visuals.mjs` | Fælles zoommodel for samlingsmarkørens synlige størrelse og kompakte/full label; statiske arbejdstegninger bruger altid fuld størrelse. |
 | `room-planner.mjs`, `room-planner.css` | Selvstændig vægarbejdsflade, indstillinger og anvendelse af forslag. |
 | `wall-routing.mjs` | Forslag langs vægge samt kontrol af radius, afstande og forhindringer. |
 | `wall-pipe-solver.mjs`, `wall-pipe-edit.mjs` | Generelle koblede rettelser af rørmål under geometriske begrænsninger. |
@@ -144,7 +146,7 @@ Den eksisterende Del appen/QR-kode peger fortsat på den offentlige app. Lokale 
 
 ## Test og faktisk valideringsniveau
 
-Der er **29** selvstændige Node-testsæt i den lokale v42-arbejdskopi. De består sammen med syntakskontrol af JavaScript og kontrol af alle **55** offlineaktiver.
+Der er **30** selvstændige Node-testsæt i den lokale v44-arbejdskopi. De består sammen med syntakskontrol af JavaScript og kontrol af alle **56** offlineaktiver.
 
 Kør fra projektets rod:
 
@@ -175,6 +177,8 @@ Version 42 er desuden gennemgået i en rigtig lokal Chromium-browser: live Ovenf
 
 Version 43 er visuelt kontrolleret i samme browser med 45°/90°/60°/37°: live Automatisk 2D og Ovenfra viser hele rørbuen i blå/mørkegrøn/gul/bordeaux, standardbuk har kun små uboksede B-numre, og kun 37° får `SPECIAL`-label. Arbejdsvisningen bruger 14 px farvet rørkrop uden standardbokse; hvis speciallabel-layoutet ikke kan placeres, vises en kompakt `B… · SPECIAL …°`-tekst direkte ved buen. Ingen browserfejl blev observeret.
 
+Version 44 er visuelt kontrolleret i lokal Chromium med et 5,5 m træk, 3 m rå rør, S1 og et 45°-buk. Ved 100 % viser live-tegningen `S1`, skala 0,4 og uændret 44 × 44 px trykområde; ved 246 % vises `S1 · DELING` næsten i fuld størrelse. Montage- og R2-arbejdstegningen viser en blå fremhævning på nøjagtig samme bane som den fysiske B1-bue, og 3D-arbejdsvisningen beholder både fremhævningen og den fulde samlingsmarkør. Ingen browserfejl eller advarsler blev observeret.
+
 Ved nye ændringer bør du prioritere almindelige og rumlige rør, forskellige radier/vinkler, negative/flere højder, forlængelse fra A, smalle skærme og mindst ét tilfælde med sammenfaldende projektioner. Kontrollér faktiske synlige elementer, ikke blot et internt `data-*`-attribut.
 
 ## Hvis brugeren senere ønsker en ny udgivelse
@@ -184,7 +188,7 @@ Den eksisterende GitHub Pages-konfiguration kan stadig bruges, men lokal udvikli
 - Udgiv kun efter en relevant bestilling fra brugeren.
 - Bevar relative stier; appen skal virke både lokalt og under `/Pipe-bend/`.
 - Koordinér versionsquery i HTML/importer og `sw.js`-cache. Nye/ændrede runtime-moduler skal være i offlineaktivlisten med den præcise importsti.
-- Cache- og importversionerne i arbejdskopien er v43. Bevar versionsnummeret samlet i HTML, importer og `sw.js` ved senere appændringer.
+- Cache- og importversionerne i arbejdskopien er v44. Bevar versionsnummeret samlet i HTML, importer og `sw.js` ved senere appændringer.
 - Bevar eksisterende ændringer, undgå force-push, og kontrollér deployment-resultatet, før du melder en ændring udgivet.
 
 ## Anbefalet første skridt for den næste agent
@@ -192,4 +196,4 @@ Den eksisterende GitHub Pages-konfiguration kan stadig bruges, men lokal udvikli
 1. Læs dette dokument og kontrollér projektmappen, dens instruktioner og ændringer.
 2. Start den lokale app og behold den samme lokale adresse fremover.
 3. Kør relevante tests; hvis du arbejder på UI, test også den faktiske synlighed og interaktion i en browser, når en browser er tilgængelig.
-4. Version 43 er implementeret, testet og bestilt udgivet. Kontrollér altid Git-status og den seneste GitHub Pages-kørsel, før en senere ændring meldes udgivet.
+4. Version 44 er implementeret, testet og bestilt udgivet oven på v43. Kontrollér altid Git-status og den seneste GitHub Pages-kørsel, før en senere ændring meldes udgivet.

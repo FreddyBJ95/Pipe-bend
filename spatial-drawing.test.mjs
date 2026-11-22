@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import {spatialLayerSelection} from './spatial-layers.mjs?v=43';
-import {geometry3D} from './spatial-geometry.mjs?v=43';
-import {projectSpatialPoint,projectSpatialGeometry,spatialArcSamples,spatialLineVisibility,pickSpatialParts,spatialRiseLabelData,classifySpatialProjection,renderSpatialWorkDrawing} from './spatial-drawing.mjs?v=43';
+import {spatialLayerSelection} from './spatial-layers.mjs?v=44';
+import {geometry3D} from './spatial-geometry.mjs?v=44';
+import {projectSpatialPoint,projectSpatialGeometry,spatialArcSamples,spatialLineVisibility,pickSpatialParts,spatialRiseLabelData,classifySpatialProjection,renderSpatialWorkDrawing} from './spatial-drawing.mjs?v=44';
 
 const close=(a,b,epsilon=1e-7)=>assert(Math.abs(a-b)<=epsilon,`${a} != ${b}`);
 assert.deepEqual(projectSpatialPoint([12,34,56],'top'),[12,34,56]);
@@ -171,6 +171,7 @@ const root6=Math.sqrt(6),root5=Math.sqrt(5),joint3D=geometry3D({radius:38,headin
 for(const view of ['top','front','side','iso']){
  const scene=new FakeSvgNode('svg',fakeDocument);renderSpatialWorkDrawing(scene,joint3D,{view,joints:[{id:'S1',lineIndex:0,distance:270}],width:900,height:720});const nodes=rootNodes(scene),marker=nodes.find(item=>item.getAttribute('data-joint')==='S1'),pipe=nodes.find(item=>item.getAttribute('data-spatial-part')==='L1');
  assert(marker,`${view}: split marker is not culled`);assert(nodes.some(item=>item.getAttribute('data-division-symbol')==='cut-band'),`${view}: split uses the prominent cut band`);
+	 assert.equal(marker.getAttribute('data-joint-visual-scale'),'1');assert.equal(marker.getAttribute('data-joint-label-mode'),'full');const hit=marker.children.find(item=>item.name==='rect'&&item.getAttribute('width')==='44'&&item.getAttribute('height')==='44'),symbol=marker.children.find(item=>item.getAttribute('data-joint-visible-symbol')==='');assert(hit,`${view}: work split keeps its 44 px target`);assert.match(symbol.getAttribute('transform'),/scale\(1\)/);
  const point=[Number(marker.getAttribute('data-joint-anchor-x')),Number(marker.getAttribute('data-joint-anchor-y'))],numbers=(pipe.getAttribute('d').match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi)||[]).map(Number),a=numbers.slice(0,2),b=numbers.slice(-2),dx=b[0]-a[0],dy=b[1]-a[1],fraction=((point[0]-a[0])*dx+(point[1]-a[1])*dy)/(dx*dx+dy*dy),nearest=[a[0]+dx*fraction,a[1]+dy*fraction];
  close(Math.hypot(point[0]-nearest[0],point[1]-nearest[1]),0,1e-6);assert(point.every(Number.isFinite));assert(point[0]>=0&&point[0]<=900&&point[1]>=0&&point[1]<=720);
  assert.match(marker.getAttribute('aria-label'),/S1 · DELING · L1 · 270 mm/);
@@ -181,6 +182,7 @@ const colored=geometry3D({radius:38,heading:0,measurementMode:'tangent',lengths:
 renderSpatialWorkDrawing(colorSvg,colored,{view:'top',formatAngle:value=>String(value),translate:value=>value,width:900,height:720});
 const colorNodes=rootNodes(colorSvg),tokens=new Set(colorNodes.map(item=>item.getAttribute('data-bend-color')).filter(Boolean));
 assert(tokens.has('45'));assert(tokens.has('90'));assert(tokens.has('special'));
+const emphasis=colorNodes.filter(item=>item.getAttribute('data-bend-emphasis'));assert.equal(emphasis.length,colored.arcs.length,'Every work bend has a visible color emphasis');for(const halo of emphasis){const body=colorNodes.find(item=>item.getAttribute('data-spatial-part')===halo.getAttribute('data-bend-emphasis'));assert.equal(halo.getAttribute('d'),body.getAttribute('d'),'Emphasis follows the exact bend path');assert(Number(halo.getAttribute('stroke-width'))>Number(body.getAttribute('stroke-width')));}
 assert(colorNodes.some(item=>item.getAttribute('data-spatial-inline-bend')==='B1'&&item.getAttribute('data-bend-code')==='45'));
 assert(colorNodes.some(item=>item.getAttribute('data-spatial-inline-bend')==='B3'&&item.getAttribute('data-bend-code')==='90'));
 assert(!colorNodes.some(item=>['B1','B3'].includes(item.getAttribute('data-spatial-label'))),'Standard bends use the colored tube and a small inline B tag, not a large label card');
