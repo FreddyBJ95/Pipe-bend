@@ -19,15 +19,17 @@ Upload indholdet af denne mappe, **inklusive `.github`**, til roden af dit repos
 
 Appen installeres fra den HTTPS-adresse, GitHub Pages giver dig; en downloadet ZIP alene er ikke en installeret PWA.
 
-## Samlinger og flere fysiske rør (v40)
+## Samlinger og flere fysiske rør (v41)
 
 Et samlet rørtræk kan opdeles i flere fysiske rør, når trækket er længere end den valgte rå rørlængde. Selve designgeometrien forbliver sammenhængende; samlingerne er et separat fremstillingslag og ændrer derfor ikke buk, højder eller vægforløb.
 
 Åbn **Samlinger og fysiske rør** under tegningen. En samling kan placeres manuelt på et lige stykke eller foreslås automatisk. Forslaget bruger kaplængden efter den valgte værktøjstabel, når opsætningen understøttes, og placerer kun samlinger på lige stykker med den valgte mindste afstand til stykkets ender. Hver samling kan have et selvstændigt tillæg på røret før og efter til indstik eller overlap; brug 0 mm ved en samling uden ekstra rørlængde.
 
-Tegningen viser S1, S2 … ved samlingerne. Materialeoversigten viser R1, R2 … med kaplængde og rest for hvert fysisk rør. Arbejdsvisningen viser hvert R-rør lagt fladt med kaplængde, B-mærker og delmål fra rørets egen start, mens de oprindelige B-numre bevares.
+Tegningen viser S1, S2 … ved samlingerne. Materialeoversigten viser R1, R2 … med kaplængde og rest for hvert fysisk rør. Arbejdsvisningen har både et samlet montageoverblik og én fuld arbejdstegning pr. fysisk R-rør. Hver R-side viser kun det pågældende rørs form, de oprindelige L/B-numre, kaplængde, tillæg og røret lagt fladt med delmål fra den fysiske kapende. På rumlige rør måles højder og værktøjets drejninger lokalt fra R-rørets overførte startreference.
 
-Ved **Udskriv / Gem PDF** kan tegning/forside, rørdata, fysiske rør, afsætningsmål, længder/bukkevinkler, de udfoldede rør og de geometriske bukkedata vælges hver for sig. Det seneste printvalg gemmes kun som en lokal enhedsindstilling. Samlinger, tillæg og mindste afstand følger derimod med i projektets JSON-fil. Ældre version 1-projekter uden disse valg åbnes fortsat med 50 mm som standardafstand og uden samlinger.
+S-markøren viser den egentlige delelinje. Ved indstik eller overlap ligger S-markøren derfor inde på den fysiske rørdel, mens `K` viser kapenden; både afstanden mellem S og K og tillægget fremgår af siden. Uden tillæg ligger S ved kapenden. Tillæg, der ville fortsætte gennem et nabobuk eller forbi rørenden, afvises.
+
+Ved **Udskriv / Gem PDF** kan samlet montageoversigt, arbejdstegningerne pr. fysisk rør, rørdata, materialeoversigt, afsætningsmål, længder/bukkevinkler, den ekstra detaljerede fladoversigt og de geometriske bukkedata vælges hver for sig. Den ekstra fladoversigt er som standard fravalgt, fordi hver R-arbejdstegning allerede har sin egen flade måltegning. Det seneste printvalg gemmes kun som en lokal enhedsindstilling. Samlinger, tillæg og mindste afstand følger derimod med i projektets JSON-fil. Ældre version 1-projekter uden disse valg åbnes fortsat med 50 mm som standardafstand og uden samlinger.
 
 - iPhone/iPad: Safari → Del → Føj til hjemmeskærm.
 - Android: Chrome → Installer app / Føj til startskærm.
@@ -85,7 +87,7 @@ Sprog, skrifttype og installation findes i Menu. Mobilvisningen bruger mindre bl
 Nyt rør åbner en dialog med navn, fuld rørlængde, diameter, gods og bukkeradius. Projektet oprettes først ved Opret rør; Annuller ændrer ikke det åbne rør. Første stykke kræver kun en gyldig længde. En tidligere ugyldig vinkel kan ikke blokere et nyt rør; vinkel og fortsættelsesfelter nulstilles ved oprettelse. Menu → Rørindstillinger kan rette dimensionerne senere. Eksisterende projekter indlæses uden at blive nulstillet. Live-tegningen står over den primære fortsættelsesblok på både telefon og computer. Længde- og vinkellister findes i Arbejdsvisning. Mål og B-referencer på selve tegningen kan stadig redigeres.
 
 ## Arbejdsvisning og udskrift
-Første A4-side indeholder rørtegningen med længder i mm, B-referencer med vinkler og tegningsnummer. For vægprojekter vises også Vægkontrol: kontrolleret eller Vægkontrol: kræver ny kontrol. Den samme status vises på datasiden, i PDF og i SVG-eksporten. Den bygger på det aktuelle rørs geometri; ændringer i hovedtegningen kræver ny kontrol og anvendelse i vægvisningen. Røret drejes og tilpasses sidens højde og bredde, og alle mål indgår i tilpasningen. Specifikationer, længde- og vinkellister, udfoldet rør og bukkedata begynder på næste side. Tegningsnummeret oprettes automatisk og kan ændres under Rørindstillinger; ældre projekter bruger projektnavnet, indtil et nummer angives.
+Første A4-side er det samlede montageoverblik med længder i mm, B-referencer, tydelige S-delelinjer og tegningsnummer. Derefter følger én A4-arbejdstegning for hvert fysisk rør R1, R2 … med lokal formtegning, kap-/tillægsdata og udfoldet mållinje. De oprindelige L/B-numre bevares, så siderne kan krydsrefereres til montageoverblikket. For vægprojekter vises også Vægkontrol: kontrolleret eller Vægkontrol: kræver ny kontrol. Den samme status vises på datasiden, i PDF og i SVG-eksporten. Den bygger på det aktuelle rørs geometri; ændringer i hovedtegningen kræver ny kontrol og anvendelse i vægvisningen. Røret drejes og tilpasses sidens højde og bredde. Specifikationer, længde- og vinkellister, udfoldede rør og bukkedata følger som valgfrit bilag. Tegningsnummeret oprettes automatisk og kan ændres under Rørindstillinger; ældre projekter bruger projektnavnet, indtil et nummer angives.
 
 ## Appikon
 Det valgte PB-logo bruges uændret i appen. PWA-manifestet indeholder192- og512-pixel ikoner samt et separat maskable-ikon med beskyttet margen. iPhone og iPad bruger et180-pixel Apple Touch-ikon.

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import {spatialLayerSelection} from './spatial-layers.mjs?v=40';
-import {geometry3D} from './spatial-geometry.mjs?v=40';
-import {projectSpatialPoint,projectSpatialGeometry,spatialArcSamples,spatialLineVisibility,pickSpatialParts,spatialRiseLabelData,classifySpatialProjection} from './spatial-drawing.mjs?v=40';
+import {spatialLayerSelection} from './spatial-layers.mjs?v=41';
+import {geometry3D} from './spatial-geometry.mjs?v=41';
+import {projectSpatialPoint,projectSpatialGeometry,spatialArcSamples,spatialLineVisibility,pickSpatialParts,spatialRiseLabelData,classifySpatialProjection,renderSpatialWorkDrawing} from './spatial-drawing.mjs?v=41';
 
 const close=(a,b,epsilon=1e-7)=>assert(Math.abs(a-b)<=epsilon,`${a} != ${b}`);
 assert.deepEqual(projectSpatialPoint([12,34,56],'top'),[12,34,56]);
@@ -139,3 +139,26 @@ const maskedHits=pickSpatialParts(projectSpatialGeometry(stacked,'top'),[500,0],
 assert(maskedHits.length&&maskedHits.every(hit=>hit.type==='length'&&hit.index===0),'Layer hit testing preserves lower original indices');
 assert.deepEqual(classifySpatialProjection(g,{view:'front',labelMode:'all'}).lines.map(part=>part.annotate),frontXZ.lines.map(part=>part.annotate),'All data keeps the previous projection-aware behavior');
 console.log('On-demand labels: zero unselected labels, one original L/B selection, explicit edge-on inspection and strict layer picking: PASS');
+
+// Exercise the actual static SVG renderer, including display IDs and a split
+// on a line that collapses to a point in the top projection. This catches
+// browser-only scope mistakes that the pure projection tests cannot see.
+class FakeSvgNode{
+ constructor(name,ownerDocument){this.name=name;this.ownerDocument=ownerDocument;this.attributes=new Map();this.children=[];this.textContent='';}
+ setAttribute(name,value){this.attributes.set(name,String(value));}
+ getAttribute(name){return this.attributes.get(name)??null;}
+ removeAttribute(name){this.attributes.delete(name);}
+ append(...items){this.children.push(...items);}
+ replaceChildren(...items){this.children=[...items];}
+ contains(){return false;}
+ querySelectorAll(){return[];}
+}
+const fakeDocument={activeElement:null,createElementNS(namespace,name){return new FakeSvgNode(name,fakeDocument);}},staticSvg=new FakeSvgNode('svg',fakeDocument),endOnProject={radius:38,heading:0,measurementMode:'tangent',lengths:[500],turns:[],bendRotations:[],startFrame:{tangent:[0,0,1],normal:[1,0,0]}},endOnGeometry=geometry3D(endOnProject);
+endOnGeometry.lines[0].displayId='L7';
+renderSpatialWorkDrawing(staticSvg,endOnGeometry,{view:'top',joints:[{id:'S3',lineIndex:0,distance:250,workLabel:'S3 · DELING'}],endpointLabels:['K','S3'],showReferenceIds:true,width:900,height:720});
+const rendered=[];for(const visit of staticSvg.children){const stack=[visit];while(stack.length){const item=stack.pop();rendered.push(item);stack.push(...item.children);}}
+assert(rendered.some(item=>item.getAttribute('data-spatial-part')==='L7'),'Static renderer preserves original display IDs');
+assert(rendered.some(item=>item.getAttribute('data-division-symbol')==='end-on'),'End-on split keeps a visible circle/cross symbol');
+assert.deepEqual(Object.fromEntries(rendered.filter(item=>item.getAttribute('data-endpoint')).map(item=>[item.getAttribute('data-endpoint'),item.getAttribute('aria-label')])),{A:'K · fysisk kapende',B:'S3 · DELING'});
+assert.match(rendered.find(item=>item.getAttribute('data-joint')==='S3').getAttribute('aria-label'),/S3 · DELING · L7 · 250 mm/);
+console.log('Static spatial work SVG: original IDs, endpoint labels and end-on split symbol PASS');

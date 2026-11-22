@@ -1,4 +1,27 @@
 const messages={
+  "Samlet montageoversigt": {"nb":"Samlet montasjeoversikt","en":"Combined installation overview"},
+  "Arbejdstegninger pr. fysisk rør": {"nb":"Arbeidstegninger per fysisk rør","en":"Workshop drawings per physical tube"},
+  "Detaljeret fladoversigt med delmål": {"nb":"Detaljert flat oversikt med delmål","en":"Detailed flat overview with interval dimensions"},
+  "DELING": {"nb":"DELING","en":"SPLIT"},
+  "af": {"nb":"av","en":"of"},
+  "Tillæg start / slut": {"nb":"Tillegg start / slutt","en":"Start / end allowance"},
+  "fra fysisk kapende": {"nb":"fra fysisk kappende","en":"from physical cut end"},
+  "før fysisk kapende": {"nb":"før fysisk kappende","en":"before physical cut end"},
+  "fysisk kapende": {"nb":"fysisk kappende","en":"physical cut end"},
+  "Delingen ligger ved den viste kapende.": {"nb":"Delingen ligger ved den viste kappenden.","en":"The split is at the cut end shown."},
+  "Dette rør har ingen deling.": {"nb":"Dette røret har ingen deling.","en":"This tube has no split."},
+  "Røret lagt fladt · mål fra fysisk kapende": {"nb":"Røret lagt flatt · mål fra fysisk kappende","en":"Tube laid flat · dimensions from physical cut end"},
+  "Højde fra {piece}-start": {"nb":"Høyde fra {piece}-start","en":"Height from {piece} start"},
+  "Højder måles lokalt fra {piece}-start.": {"nb":"Høyder måles lokalt fra {piece}-start.","en":"Heights are measured locally from the start of {piece}."},
+  "Ingen buk på dette rør.": {"nb":"Ingen bøy på dette røret.","en":"No bends on this tube."},
+  "Rediger": {"nb":"Rediger","en":"Edit"},
+  "Samling {index} har ugyldige mål.": {"nb":"Skjøt {index} har ugyldige mål.","en":"Joint {index} has invalid dimensions."},
+  "Samling {index} skal ligge på et lige stykke og mindst {clearance} mm fra stykkets ender.": {"nb":"Skjøt {index} må ligge på et rett stykke og minst {clearance} mm fra stykkets ender.","en":"Joint {index} must be on a straight section and at least {clearance} mm from its ends."},
+  "Sluttillægget ved samling {first} og starttillægget ved samling {second} overlapper hinanden.": {"nb":"Sluttillegget ved skjøt {first} og starttillegget ved skjøt {second} overlapper hverandre.","en":"The end allowance at joint {first} and the start allowance at joint {second} overlap."},
+  "Starttillægget ved samling {index} må ikke krydse det forrige buk eller rørstarten.": {"nb":"Starttillegget ved skjøt {index} kan ikke krysse forrige bøy eller rørstarten.","en":"The start allowance at joint {index} must not cross the previous bend or tube start."},
+  "Sluttillægget ved samling {index} må ikke krydse det næste buk eller rørslutningen.": {"nb":"Sluttillegget ved skjøt {index} kan ikke krysse neste bøy eller rørslutten.","en":"The end allowance at joint {index} must not cross the next bend or tube end."},
+  "Sluttillægget ved samling {index} må ikke krydse den næste samling.": {"nb":"Sluttillegget ved skjøt {index} kan ikke krysse neste skjøt.","en":"The end allowance at joint {index} must not cross the next joint."},
+  "Starttillægget ved samling {index} må ikke krydse den forrige samling.": {"nb":"Starttillegget ved skjøt {index} kan ikke krysse forrige skjøt.","en":"The start allowance at joint {index} must not cross the previous joint."},
   "Udskriftsindhold": {"nb":"Utskriftsinnhold","en":"Print contents"},
   "Vælg de dele, der skal med i udskriften eller PDF-filen.": {"nb":"Velg delene som skal være med i utskriften eller PDF-filen.","en":"Choose the sections to include in the printout or PDF."},
   "Tag med i udskriften": {"nb":"Ta med i utskriften","en":"Include in printout"},
@@ -22,7 +45,7 @@ const messages={
   "Alle mål starter ved det fysiske rørs kapende og inkluderer eventuelt samlingstillæg.": {"nb":"Alle mål starter ved det fysiske rørets kappende og inkluderer eventuelt skjøtetillegg.","en":"All measurements start at the physical cut end and include any joint allowance."},
   "Rørstart": {"nb":"Rørstart","en":"Tube start"},
   "Mærkerne ligger tæt. Brug delmålene nedenfor.": {"nb":"Merkene ligger tett. Bruk delmålene nedenfor.","en":"The marks are close together. Use the step dimensions below."},
-  "Ved et nyt fysisk rør overføres 0°-referencen ved samlingen. Drejninger følger de oprindelige B-numre fra A mod B.": {"nb":"Ved et nytt fysisk rør overføres 0°-referansen ved skjøten. Dreiningene følger de opprinnelige B-numrene fra A mot B.","en":"At a new physical tube, transfer the 0° reference across the joint. Rotations follow the original B numbers from A toward B."},
+  "Ved et nyt fysisk rør overføres 0°-referencen ved samlingen. Drejninger måles lokalt på røret; B-numrene følger den samlede montage fra A mod B.": {"nb":"Ved et nytt fysisk rør overføres 0°-referansen ved skjøten. Dreiningene måles lokalt på røret; B-numrene følger den samlede montasjen fra A mot B.","en":"At a new physical tube, transfer the 0° reference across the joint. Rotations are measured locally on the tube; B numbers follow the complete assembly from A toward B."},
   "Samlinger og fysiske rør": {"nb":"Skjøter og fysiske rør","en":"Joints and physical tubes"},
   "Foreslå samlinger": {"nb":"Foreslå skjøter","en":"Suggest joints"},
   "Tilføj samling": {"nb":"Legg til skjøt","en":"Add joint"},
@@ -1065,7 +1088,8 @@ const messages={
 export const locales={da:'da-DK',nb:'nb-NO',en:'en-GB'};
 export let language='da';
 try{const saved=localStorage.getItem('pipe-bend-language');if(saved in locales)language=saved;}catch{}
-export function t(text,values={}){let out=language==='da'?text:(messages[text]?.[language]??text);return out.replace(/\{(\w+)\}/g,(match,key)=>values[key]??match);}
+const escapePattern=text=>text.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),messagePatterns=Object.keys(messages).filter(key=>/\{\w+\}/.test(key)).map(key=>{const names=[],source=key.split(/(\{\w+\})/).map(part=>{const match=/^\{(\w+)\}$/.exec(part);if(match){names.push(match[1]);return'(.+?)';}return escapePattern(part);}).join('');return{key,names,regex:new RegExp('^'+source+'$')};});
+export function t(text,values={}){let key=text,resolved={...values};if(language!=='da'&&!messages[key])for(const pattern of messagePatterns){const match=pattern.regex.exec(text);if(!match)continue;key=pattern.key;pattern.names.forEach((name,index)=>{if(resolved[name]===undefined)resolved[name]=match[index+1];});break;}let out=language==='da'?text:(messages[key]?.[language]??text);return out.replace(/\{(\w+)\}/g,(match,name)=>resolved[name]??match);}
 const texts=[],attrs=[];
 export function captureTranslations(){const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);while(walker.nextNode()){const node=walker.currentNode;if(node.parentElement?.closest('script,style'))continue;const trimmed=node.nodeValue.trim();if(messages[trimmed])texts.push({node,text:trimmed,before:node.nodeValue.match(/^\s*/)[0],after:node.nodeValue.match(/\s*$/)[0]});}for(const node of document.querySelectorAll('[aria-label]')){const text=node.getAttribute('aria-label');if(messages[text])attrs.push({node,text});}}
 export function applyLanguage(next){if(!(next in locales))return;language=next;try{localStorage.setItem('pipe-bend-language',next);}catch{}document.documentElement.lang=next;document.title='Pipe-bend';for(const item of texts)if(item.node.isConnected)item.node.nodeValue=item.before+t(item.text)+item.after;for(const item of attrs)if(item.node.isConnected)item.node.setAttribute('aria-label',t(item.text));}

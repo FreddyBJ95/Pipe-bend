@@ -1,4 +1,4 @@
-import {t,language,locales} from './i18n.mjs?v=40';
+import {t,language,locales} from './i18n.mjs?v=41';
 const choices=[
  {id:'poppins',name:'Poppins'},
  {id:'roboto',name:'Roboto'},

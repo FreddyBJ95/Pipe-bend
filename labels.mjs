@@ -1,4 +1,4 @@
-import {rectPolygon,polygonsOverlap} from './dimension-layout.mjs?v=40';
+import {rectPolygon,polygonsOverlap} from './dimension-layout.mjs?v=41';
 
 const bounds=polygon=>({minX:Math.min(...polygon.map(p=>p[0])),maxX:Math.max(...polygon.map(p=>p[0])),minY:Math.min(...polygon.map(p=>p[1])),maxY:Math.max(...polygon.map(p=>p[1]))});
 const inside=(polygon,width,height,padding)=>polygon.every(([x,y])=>x>=padding&&x<=width-padding&&y>=padding&&y<=height-padding);
@@ -89,7 +89,7 @@ export function bendReferenceLayout(arcs,project,options={}) {
  const refs=arcs.map((arc,index)=>{
   const midpoint=arc.samples[Math.floor((arc.samples.length-1)/2)],p=project(midpoint),center=arc.center?project(arc.center):null;
   const length=center?distance(p,center):0;
-  return {type:'angle',index,order:index,x:p[0],y:p[1],id:'B'+(index+1),outward:length?[(p[0]-center[0])/length,(p[1]-center[1])/length]:undefined};
+  return {type:'angle',index,order:index,x:p[0],y:p[1],id:arc.displayId||'B'+(index+1),outward:length?[(p[0]-center[0])/length,(p[1]-center[1])/length]:undefined};
  });
  return {...referenceLayout(refs,options),anchors:refs,project};
 }

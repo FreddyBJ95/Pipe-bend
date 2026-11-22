@@ -8,7 +8,7 @@ Dette dokument er skrevet til den næste Codex-agent. Læs også `README.md`, og
 
 Brugeren ønsker nu at arbejde med hele projektet lokalt på sin computer og lade sin egen Codex-agent overtage. Denne overdragelse er særskilt godkendt til at blive lagt på Git. Fortsæt lokalt; udgiv ikke nye appændringer automatisk uden brugerens ønske. Slet ikke det eksisterende repository eller den offentlige app.
 
-Kodegrundlaget er **v40**, videreført fra commit `852bfe9`. Version 40 tilføjer samlinger og flere fysiske rør. Den offentlige app udgives fra `main` gennem det eksisterende GitHub Actions-workflow.
+Den lokale arbejdskopi er **v41**, videreført fra den udgivne v40-commit `488355a`. Version 41 tilføjer én arbejdstegning pr. fysisk rør og tydelige delelinjer. Den offentlige app er fortsat v40, indtil brugeren særskilt beder om at få denne ændring committed og udgivet. Udgivelse sker fra `main` gennem det eksisterende GitHub Actions-workflow.
 
 - Repository: https://github.com/FreddyBJ95/Pipe-bend
 - Offentlig app: https://freddybj95.github.io/Pipe-bend/
@@ -30,7 +30,8 @@ Kodegrundlaget er **v40**, videreført fra commit `852bfe9`. Version 40 tilføje
 10. De rumlige visninger har **Mål: Alle mål / Ved tryk**. Ved tryk vises kun det valgte rørs længde eller bukkets vinkel og højde. Tomt tryk skjuler data igen. I redigeringen kan den viste markering trykkes igen for at rette målet. Træk i 3D drejer modellen uden samtidig at vælge et mål.
 11. Venstre/højre og de øvrige retningssymboler står samlet i én vandret række. På meget smalle skærme ruller rækken sidelæns; trykfladerne er fortsat 44 px.
 12. Et sammenhængende træk kan opdeles i fysiske rør R1, R2 … med samlinger S1, S2 … på lige stykker. Samlinger kan placeres manuelt eller foreslås ud fra rå rørlængde, værktøjstabellens kaplængde og en brugerdefineret mindste afstand til buk. Tillæg før/efter samlingen understøtter indstik og overlap.
-13. Arbejdsvisningen viser hvert fysisk rør lagt fladt med lokale B-mærker, kædemål og samlet kaplængde. Printdialogen kan medtage eller fravælge forside, rørdata, fysiske rør, afsætningsmål, referencelister, flade rør og geometriske bukkedata. Printvalget gemmes lokalt og er ikke en del af projektfilen.
+13. Arbejdsvisningen viser et samlet montageoverblik og derefter én A4-lignende arbejdstegning pr. fysisk rør. Hver R-side har lokal formtegning med de oprindelige L/B-numre, kaplængde/tillæg og et udfoldet rør med mål fra kapenden. S1/S2 vises ved den egentlige delelinje; ved overlap/indstik ligger S inde på røret, og `K` viser den fysiske kapende. Rumlige R-sider bruger lokale højder og drejninger fra den overførte reference ved R-start.
+14. Printdialogen kan særskilt medtage eller fravælge montageoverblik, R-arbejdstegninger, rørdata, fysiske rør, afsætningsmål, referencelister, en ekstra detaljeret fladoversigt og geometriske bukkedata. Det ekstra flade bilag er fravalgt som standard, fordi R-siderne allerede indeholder den flade tegning. Printvalget gemmes lokalt og er ikke en del af projektfilen.
 
 De tre seneste brugerønsker om retningsrækken, lag og mål ved tryk er allerede implementeret og udgivet. Genimplementér dem ikke blot, fordi de er gentaget i samtalehistorikken. Hvis noget fortsat fejler, undersøg den konkrete kørsel, synlighed og indlæste version.
 
@@ -54,7 +55,7 @@ De tre seneste brugerønsker om retningsrækken, lag og mål ved tryk er allered
 | `measurements.mjs` | Målemetoder, tangentfradrag, validering og værktøjets afsætningsmål. |
 | `benders.mjs` | Dokumenterede værktøjsprofiler og producentens tabelværdier. |
 | `displayed-marks.mjs` | Afrunder absolutte mærker én gang og beregner synlige delmål som differencer. |
-| `material-sections.mjs` | Validerer samlinger, opdeler trækket i fysiske rør, beregner lokale bukkemærker og foreslår samlinger efter rå rørlængde. |
+| `material-sections.mjs` | Validerer samlinger/tillæg, opdeler trækket i fysiske rør, bygger lokal 2D/3D-geometri pr. R-rør, beregner lokale bukkemærker og foreslår samlinger efter rå rørlængde. |
 | `spatial-geometry.mjs` | Rumlige linjer/cirkelbuer, startframe, bukkeplaner og fysisk drejning. |
 | `spatial-drawing.mjs` | Projektion, synlige/skjulte dele, relevante mål, lag, 3D-rotation og trykvalg. |
 | `spatial-layers.mjs` | Finder faktiske konstante højder og masker med de oprindelige L/B-indekser. |
@@ -139,7 +140,7 @@ Den eksisterende Del appen/QR-kode peger fortsat på den offentlige app. Lokale 
 
 ## Test og faktisk valideringsniveau
 
-Der er **28** selvstændige Node-testsæt i den lokale v40-arbejdskopi. De består sammen med syntakskontrol af JavaScript og kontrol af alle **54** offlineaktiver.
+Der er **28** selvstændige Node-testsæt i den lokale v41-arbejdskopi. De består sammen med syntakskontrol af JavaScript og kontrol af alle **54** offlineaktiver.
 
 Kør fra projektets rod:
 
@@ -166,7 +167,7 @@ Det eksisterende GitHub Actions-workflow udgiver appen, men kører ikke automati
 
 Der er desuden kørt lokale scratch-tests af de faktiske event-handlere ved 280, 340 og 736 px: projektskift, begge ender, import/eksport, ugyldige filer, SVG-synlighed, lag, trykvalg, 3D-drejning, arbejdsvisning og udskriftens renderforløb. De scripts er ikke en del af det offentlige repository. Vigtige seneste navne er `native-spatial-app-smoke.mjs`, `work-height-layer-smoke.mjs` og `on-demand-label-smoke.mjs`.
 
-Disse UI-tests bruger en DOM-adapter, der nu efterligner SVG's faktiske attributadfærd. SVG-billeder er også visuelt gennemgået med en lokal rasterizer. Der er **ikke** gennemført en fuld browsertest eller en test på en fysisk telefon; hævd ikke andet. Tidligere UI-tests var utilstrækkelige, fordi de fejlagtigt gav SVG en reflekterende `hidden`-egenskab og fjernede `hidden` i billedkopierne.
+Version 41 er desuden gennemgået i en rigtig lokal Chromium-browser ved 1200 px og i den smalle sidepanelsvisning: montageoverblik, R1/R2-sider, interne S-markører med 25/35 mm tillæg, udfoldede rør og det nye printvalg er synligt kontrolleret uden browserfejl. Der er ikke testet på en fysisk telefon eller udskrevet en fysisk PDF.
 
 Ved nye ændringer bør du prioritere almindelige og rumlige rør, forskellige radier/vinkler, negative/flere højder, forlængelse fra A, smalle skærme og mindst ét tilfælde med sammenfaldende projektioner. Kontrollér faktiske synlige elementer, ikke blot et internt `data-*`-attribut.
 
@@ -177,7 +178,7 @@ Den eksisterende GitHub Pages-konfiguration kan stadig bruges, men lokal udvikli
 - Udgiv kun efter en relevant bestilling fra brugeren.
 - Bevar relative stier; appen skal virke både lokalt og under `/Pipe-bend/`.
 - Koordinér versionsquery i HTML/importer og `sw.js`-cache. Nye/ændrede runtime-moduler skal være i offlineaktivlisten med den præcise importsti.
-- Cache- og importversionerne er v40. Bevar versionsnummeret samlet i HTML, importer og `sw.js` ved senere appændringer.
+- Cache- og importversionerne i arbejdskopien er v41. Bevar versionsnummeret samlet i HTML, importer og `sw.js` ved senere appændringer.
 - Bevar eksisterende ændringer, undgå force-push, og kontrollér deployment-resultatet, før du melder en ændring udgivet.
 
 ## Anbefalet første skridt for den næste agent
@@ -185,4 +186,4 @@ Den eksisterende GitHub Pages-konfiguration kan stadig bruges, men lokal udvikli
 1. Læs dette dokument og kontrollér projektmappen, dens instruktioner og ændringer.
 2. Start den lokale app og behold den samme lokale adresse fremover.
 3. Kør relevante tests; hvis du arbejder på UI, test også den faktiske synlighed og interaktion i en browser, når en browser er tilgængelig.
-4. Version 40 er implementeret, testet og bestilt udgivet af brugeren. Kontrollér den aktuelle Git- og deploymentstatus, før næste ændring.
+4. Version 41 er implementeret og testet lokalt, men ikke committed eller udgivet. Kontrollér Git-status og få en relevant bestilling, før den udgives.
