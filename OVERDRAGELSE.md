@@ -8,7 +8,7 @@ Dette dokument er skrevet til den næste Codex-agent. Læs også `README.md`, og
 
 Brugeren ønsker nu at arbejde med hele projektet lokalt på sin computer og lade sin egen Codex-agent overtage. Denne overdragelse er særskilt godkendt til at blive lagt på Git. Fortsæt lokalt; udgiv ikke nye appændringer automatisk uden brugerens ønske. Slet ikke det eksisterende repository eller den offentlige app.
 
-Den lokale arbejdskopi er **v41**, videreført fra den udgivne v40-commit `488355a`. Version 41 tilføjer én arbejdstegning pr. fysisk rør og tydelige delelinjer. Den offentlige app er fortsat v40, indtil brugeren særskilt beder om at få denne ændring committed og udgivet. Udgivelse sker fra `main` gennem det eksisterende GitHub Actions-workflow.
+Den aktuelle udgave er **v42**, videreført fra v41-commit `bc39687`. Version 42 gør samlinger markante i alle 2D/3D-visninger, retter samlingens rumlige projektion og farvekoder 30°/45°/60°/90° med en eksplicit `SPECIAL`-label på andre vinkler. Brugeren bad den 22. november 2026 om at få v42 committed og udgivet fra `main` gennem det eksisterende GitHub Actions-workflow.
 
 - Repository: https://github.com/FreddyBJ95/Pipe-bend
 - Offentlig app: https://freddybj95.github.io/Pipe-bend/
@@ -32,6 +32,8 @@ Den lokale arbejdskopi er **v41**, videreført fra den udgivne v40-commit `48835
 12. Et sammenhængende træk kan opdeles i fysiske rør R1, R2 … med samlinger S1, S2 … på lige stykker. Samlinger kan placeres manuelt eller foreslås ud fra rå rørlængde, værktøjstabellens kaplængde og en brugerdefineret mindste afstand til buk. Tillæg før/efter samlingen understøtter indstik og overlap.
 13. Arbejdsvisningen viser et samlet montageoverblik og derefter én A4-lignende arbejdstegning pr. fysisk rør. Hver R-side har lokal formtegning med de oprindelige L/B-numre, kaplængde/tillæg og et udfoldet rør med mål fra kapenden. S1/S2 vises ved den egentlige delelinje; ved overlap/indstik ligger S inde på røret, og `K` viser den fysiske kapende. Rumlige R-sider bruger lokale højder og drejninger fra den overførte reference ved R-start.
 14. Printdialogen kan særskilt medtage eller fravælge montageoverblik, R-arbejdstegninger, rørdata, fysiske rør, afsætningsmål, referencelister, en ekstra detaljeret fladoversigt og geometriske bukkedata. Det ekstra flade bilag er fravalgt som standard, fordi R-siderne allerede indeholder den flade tegning. Printvalget gemmes lokalt og er ikke en del af projektfilen.
+15. Samlinger bruger samme tydelige dobbeltlinje og `S… · DELING`-label i live 2D, rumlige projektioner, arbejdsvisning og print. End-on vises som ring/kryds. 3D-markøren beregnes fra den projicerede linje; brug ikke original XYZ direkte i skærmprojektøren.
+16. Buk på 30°/45°/60°/90° er henholdsvis violet/blå/okker/mørkegrøn. Andre vinkler er bordeaux, stiplede og mærket `SPECIAL`; graden vises altid som tekst. Visningsvalget `Rørtegning` er omdøbt til `Automatisk 2D`, fordi det er en automatisk drejet plantilpasning og ikke den faste Ovenfra-projektion.
 
 De tre seneste brugerønsker om retningsrækken, lag og mål ved tryk er allerede implementeret og udgivet. Genimplementér dem ikke blot, fordi de er gentaget i samtalehistorikken. Hvis noget fortsat fejler, undersøg den konkrete kørsel, synlighed og indlæste version.
 
@@ -61,6 +63,7 @@ De tre seneste brugerønsker om retningsrækken, lag og mål ved tryk er allered
 | `spatial-layers.mjs` | Finder faktiske konstante højder og masker med de oprindelige L/B-indekser. |
 | `main-pipe-drawing.mjs`, `main-pipe-detail.mjs` | Den oprindelige rørtegning med præcise buer og zoomdetaljer. |
 | `labels.mjs`, `dimension-layout.mjs`, `main-detail-annotations.mjs` | Placering af lokale referencer og læsbare mål. |
+| `bend-visuals.mjs` | Fælles, afledt farve- og labelmodel for 30°/45°/60°/90° samt ikke-standard `SPECIAL`-buk. |
 | `room-planner.mjs`, `room-planner.css` | Selvstændig vægarbejdsflade, indstillinger og anvendelse af forslag. |
 | `wall-routing.mjs` | Forslag langs vægge samt kontrol af radius, afstande og forhindringer. |
 | `wall-pipe-solver.mjs`, `wall-pipe-edit.mjs` | Generelle koblede rettelser af rørmål under geometriske begrænsninger. |
@@ -140,7 +143,7 @@ Den eksisterende Del appen/QR-kode peger fortsat på den offentlige app. Lokale 
 
 ## Test og faktisk valideringsniveau
 
-Der er **28** selvstændige Node-testsæt i den lokale v41-arbejdskopi. De består sammen med syntakskontrol af JavaScript og kontrol af alle **54** offlineaktiver.
+Der er **29** selvstændige Node-testsæt i den lokale v42-arbejdskopi. De består sammen med syntakskontrol af JavaScript og kontrol af alle **55** offlineaktiver.
 
 Kør fra projektets rod:
 
@@ -167,7 +170,7 @@ Det eksisterende GitHub Actions-workflow udgiver appen, men kører ikke automati
 
 Der er desuden kørt lokale scratch-tests af de faktiske event-handlere ved 280, 340 og 736 px: projektskift, begge ender, import/eksport, ugyldige filer, SVG-synlighed, lag, trykvalg, 3D-drejning, arbejdsvisning og udskriftens renderforløb. De scripts er ikke en del af det offentlige repository. Vigtige seneste navne er `native-spatial-app-smoke.mjs`, `work-height-layer-smoke.mjs` og `on-demand-label-smoke.mjs`.
 
-Version 41 er desuden gennemgået i en rigtig lokal Chromium-browser ved 1200 px og i den smalle sidepanelsvisning: montageoverblik, R1/R2-sider, interne S-markører med 25/35 mm tillæg, udfoldede rør og det nye printvalg er synligt kontrolleret uden browserfejl. Der er ikke testet på en fysisk telefon eller udskrevet en fysisk PDF.
+Version 42 er desuden gennemgået i en rigtig lokal Chromium-browser: live Ovenfra og 3D-overblik viser samlingen på det projicerede rør, `S1 · DELING`, den blå 45°-kode og `SPECIAL · 37°`; montageoverblikket viser samme markante deling, og R1/R2-siderne blev genereret uden browserfejl. Der er ikke testet på en fysisk telefon eller udskrevet en fysisk PDF.
 
 Ved nye ændringer bør du prioritere almindelige og rumlige rør, forskellige radier/vinkler, negative/flere højder, forlængelse fra A, smalle skærme og mindst ét tilfælde med sammenfaldende projektioner. Kontrollér faktiske synlige elementer, ikke blot et internt `data-*`-attribut.
 
@@ -178,7 +181,7 @@ Den eksisterende GitHub Pages-konfiguration kan stadig bruges, men lokal udvikli
 - Udgiv kun efter en relevant bestilling fra brugeren.
 - Bevar relative stier; appen skal virke både lokalt og under `/Pipe-bend/`.
 - Koordinér versionsquery i HTML/importer og `sw.js`-cache. Nye/ændrede runtime-moduler skal være i offlineaktivlisten med den præcise importsti.
-- Cache- og importversionerne i arbejdskopien er v41. Bevar versionsnummeret samlet i HTML, importer og `sw.js` ved senere appændringer.
+- Cache- og importversionerne i arbejdskopien er v42. Bevar versionsnummeret samlet i HTML, importer og `sw.js` ved senere appændringer.
 - Bevar eksisterende ændringer, undgå force-push, og kontrollér deployment-resultatet, før du melder en ændring udgivet.
 
 ## Anbefalet første skridt for den næste agent
@@ -186,4 +189,4 @@ Den eksisterende GitHub Pages-konfiguration kan stadig bruges, men lokal udvikli
 1. Læs dette dokument og kontrollér projektmappen, dens instruktioner og ændringer.
 2. Start den lokale app og behold den samme lokale adresse fremover.
 3. Kør relevante tests; hvis du arbejder på UI, test også den faktiske synlighed og interaktion i en browser, når en browser er tilgængelig.
-4. Version 41 er implementeret og testet lokalt, men ikke committed eller udgivet. Kontrollér Git-status og få en relevant bestilling, før den udgives.
+4. Version 42 er implementeret, testet og bestilt udgivet. Kontrollér altid Git-status og den seneste GitHub Pages-kørsel, før en senere ændring meldes udgivet.

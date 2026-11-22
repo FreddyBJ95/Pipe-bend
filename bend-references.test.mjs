@@ -2,18 +2,19 @@ import assert from 'node:assert/strict';
 import {geometry,extend} from './geometry.mjs';
 import {bendReferenceLayout,bestDrawingAngle,leaderCrossesPipe} from './labels.mjs';
 import {polygonsOverlap} from './dimension-layout.mjs';
+import {bendBadgeLines} from './bend-visuals.mjs';
 
 const close=(a,b)=>assert.ok(Math.abs(a-b)<1e-8,`${a} != ${b}`);
 const rect=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
 const footprint=(a,b,pad=8)=>{const dx=b[0]-a[0],dy=b[1]-a[1],length=Math.hypot(dx,dy)||1,nx=-dy/length*pad,ny=dx/length*pad;return[[a[0]+nx,a[1]+ny],[b[0]+nx,b[1]+ny],[b[0]-nx,b[1]-ny],[a[0]-nx,a[1]-ny]];};
-function scene(state,work=false,width=900){
+function scene(state,work=false,width=900,labelFor){
  const g=geometry(state),original=structuredClone(g),height=work?1200:Math.max(430,Math.min(540,width*.65));
  const plotWidth=width-(work?150:112),plotHeight=height-(work?150:112),angle=bestDrawingAngle(g.points,plotWidth,plotHeight),c=Math.cos(angle),s=Math.sin(angle),rotate=([x,y])=>[x*c-y*s,x*s+y*c],rotated=g.points.map(rotate),xs=rotated.map(p=>p[0]),ys=rotated.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),scale=Math.min(plotWidth/Math.max(1,maxX-minX),plotHeight/Math.max(1,maxY-minY));
  const project=p=>{const [x,y]=rotate(p);return[width/2+(x-(minX+maxX)/2)*scale,height/2-(y-(minY+maxY)/2)*scale];};
  const pipe=g.lines.map(l=>({polygon:footprint(project(l.start),project(l.end))}));
  for(let index=0;index<g.arcs.length;index++){const arc=g.arcs[index];for(let j=0;j<arc.samples.length-1;j+=4)pipe.push({index,polygon:footprint(project(arc.samples[j]),project(arc.samples[Math.min(j+4,arc.samples.length-1)]))});}
  const obstacles=[project(g.start),project(g.end)].map(([x,y])=>rect(x-23,y-23,46,46));
- const layout=bendReferenceLayout(g.arcs,project,{width,height,fontSize:work?18:13,pipe,obstacles,maxLeader:28});
+ const layout=bendReferenceLayout(g.arcs,project,{width,height,fontSize:work?18:13,pipe,obstacles,maxLeader:28,labelFor});
  assert.equal(layout.height,height,'References may not stretch the drawing and shrink text');
  assert.equal(layout.project,project,'Label placement cannot shift the model projection');
  assert.equal(layout.labels.length+layout.unplaced.length,g.arcs.length,'Every bend must remain accounted for');
@@ -44,6 +45,9 @@ for(const fixture of [old,screenshot,saved])for(const mirror of [1,-1]){
 for(const turn of [-135,-45,45,90])for(const work of [false,true])scene(extend(old,'A',220,turn),work);
 const dense={radius:80,heading:0,lengths:Array.from({length:201},(_,i)=>80+i%5*10),turns:Array.from({length:200},(_,i)=>i%2?-45:45)};
 for(const work of [false,true]){const layout=scene(dense,work);assert(layout.unplaced.length>0,'A dense project uses the complete list rather than overlapping SVG labels');assert.equal(layout.anchors.length,200);}
+const colored={radius:38,heading:0,measurementMode:'tangent',lengths:[500,420,460,380,520],turns:[30,45,37,90]},labelFor=(arc,index,id)=>bendBadgeLines(id,arc.turn,{format:String,special:'SPECIAL'}),wideColored=scene(colored,false,900,labelFor),narrowColored=scene(colored,false,304,labelFor);
+assert.equal(wideColored.labels.length,colored.turns.length);assert.deepEqual(wideColored.labels.map(label=>label.labelLines),[['B1','30°'],['B2','45°'],['B3','SPECIAL · 37°'],['B4','90°']]);
+assert.equal(narrowColored.labels.length+narrowColored.unplaced.length,colored.turns.length);assert(narrowColored.labels.every(label=>label.labelLines.length===2));
 // A leader may share its source dot, but no foreign centreline crossing.
 assert(leaderCrossesPipe([0,0],[30,0],[{polygon:footprint([15,-10],[15,10])}]));
 assert(!leaderCrossesPipe([0,0],[0,20],[{polygon:footprint([-10,0],[10,0])}]));

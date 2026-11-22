@@ -127,8 +127,8 @@ export function pieceWorkProject(project,sourceGeometry,piece){
  work.bendIds=bendIndices.map(index=>`B${index+1}`);
  work.endpointLabels={start:allowanceStart>EPS?'Rørstart':piece.from,end:allowanceEnd>EPS?'Rørslut':piece.to};
  work.joints=[];
- if(allowanceStart>EPS)work.joints.push({id:piece.from,workLabel:`${piece.from} · DELING`,lineIndex:0,originalLineIndex:lineStart,lineId:work.lineIds[0],distance:allowanceStart,side:'start',sourceIndex:piece.start?.sourceIndex});
- if(allowanceEnd>EPS){const lineIndex=lengths.length-1;work.joints.push({id:piece.to,workLabel:`${piece.to} · DELING`,lineIndex,originalLineIndex:lineStart+lineIndex,lineId:work.lineIds[lineIndex],distance:lengths[lineIndex]-allowanceEnd,side:'end',sourceIndex:piece.end?.sourceIndex});}
+	if(allowanceStart>EPS||piece.from?.startsWith('S'))work.joints.push({id:piece.from,workLabel:`${piece.from} · DELING`,lineIndex:0,originalLineIndex:lineStart,lineId:work.lineIds[0],distance:allowanceStart,side:'start',sourceIndex:piece.start?.sourceIndex,atEndpoint:allowanceStart<=EPS});
+	if(allowanceEnd>EPS||piece.to?.startsWith('S')){const lineIndex=lengths.length-1;work.joints.push({id:piece.to,workLabel:`${piece.to} · DELING`,lineIndex,originalLineIndex:lineStart+lineIndex,lineId:work.lineIds[lineIndex],distance:lengths[lineIndex]-allowanceEnd,side:'end',sourceIndex:piece.end?.sourceIndex,atEndpoint:allowanceEnd<=EPS});}
  return work;
 }
 

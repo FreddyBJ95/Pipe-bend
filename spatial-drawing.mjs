@@ -1,6 +1,7 @@
-import {spatialLayerSelection} from './spatial-layers.mjs?v=41';
-import {createWallViewport} from './wall-viewport.mjs?v=41';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=41';
+import {spatialLayerSelection} from './spatial-layers.mjs?v=42';
+import {createWallViewport} from './wall-viewport.mjs?v=42';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=42';
+import {bendVisual,bendAccessibleLabel} from './bend-visuals.mjs?v=42';
 
 const NS='http://www.w3.org/2000/svg',EPS=1e-8;
 const finite=n=>typeof n==='number'&&Number.isFinite(n);
@@ -219,20 +220,21 @@ function paintTube(frame,group,pixelsPerUnit=1,preview=null){
   const previewPoint=p=>P(p.map((value,i)=>value+delta[i]));
   for(const line of projection.lines)node(svg,'path',{d:polyline([line.start,line.end],previewPoint),fill:'none',stroke:'#8dbba8','stroke-width':1.5,'vector-effect':'non-scaling-stroke','stroke-dasharray':'6 5',opacity:.55,'data-spatial-preview':''},group);for(const arc of projection.arcs)node(svg,'path',{d:polyline(arc.samples,previewPoint),fill:'none',stroke:'#8dbba8','stroke-width':1.5,'vector-effect':'non-scaling-stroke','stroke-dasharray':'6 5',opacity:.55,'data-spatial-preview':''},group);}
  for(const part of parts){
-  const displayId=part.type==='length'?lineId(geometry,part.index):bendId(geometry,part.index),selected=selectedPart(settings.selected,part.type,part.index),attrs={'data-spatial-part':displayId,'data-length-id':part.type==='length'?displayId:undefined,'data-bend-id':part.type==='angle'?displayId:undefined};for(const key of Object.keys(attrs))if(attrs[key]===undefined)delete attrs[key];
+  const displayId=part.type==='length'?lineId(geometry,part.index):bendId(geometry,part.index),selected=selectedPart(settings.selected,part.type,part.index),visual=part.type==='angle'?bendVisual(geometry.arcs[part.index].turn):null,attrs={'data-spatial-part':displayId,'data-length-id':part.type==='length'?displayId:undefined,'data-bend-id':part.type==='angle'?displayId:undefined,'data-bend-color':visual?.key,'data-bend-kind':visual?(visual.standard?'standard':'special'):undefined};for(const key of Object.keys(attrs))if(attrs[key]===undefined)delete attrs[key];
   if(part.collapsed){const p=P(part.points[0]);node(svg,'circle',{...attrs,cx:p[0],cy:p[1],r:width/2,fill:selected?'#f3d8ac':'#deeee7',stroke:selected?'#b56a12':'#699581','stroke-width':1,'vector-effect':'non-scaling-stroke'},group);continue;}
   const d=polyline(part.points,P);
-  if(width*pixelsPerUnit<1.5)node(svg,'path',{d,fill:'none',stroke:'#699581','stroke-width':1.25,'vector-effect':'non-scaling-stroke'},group);
-  node(svg,'path',{...attrs,d,fill:'none',stroke:selected?'#b56a12':'#91ad9f','stroke-width':width,'stroke-linejoin':'round','stroke-linecap':'butt'},group);
-  if(inner>0)node(svg,'path',{d,fill:'none',stroke:selected?'#f5e4c9':'#deeee7','stroke-width':inner,'stroke-linejoin':'round','stroke-linecap':'butt'},group);
-  if(width*pixelsPerUnit>=8)node(svg,'path',{d,fill:'none',stroke:'#477963','stroke-width':.65,'vector-effect':'non-scaling-stroke','stroke-dasharray':'4 5'},group);
+  if(width*pixelsPerUnit<1.5)node(svg,'path',{d,fill:'none',stroke:visual?.stroke||'#699581','stroke-width':1.25,'vector-effect':'non-scaling-stroke'},group);
+  if(selected&&visual)node(svg,'path',{d,fill:'none',stroke:'#b56a12','stroke-width':width+4,'stroke-linejoin':'round','stroke-linecap':'butt'},group);
+  node(svg,'path',{...attrs,d,fill:'none',stroke:visual?.stroke||(selected?'#b56a12':'#91ad9f'),'stroke-width':width,'stroke-linejoin':'round','stroke-linecap':'butt'},group);
+  if(inner>0)node(svg,'path',{d,fill:'none',stroke:visual?.fill||(selected?'#f5e4c9':'#deeee7'),'stroke-width':inner,'stroke-linejoin':'round','stroke-linecap':'butt'},group);
+  if(width*pixelsPerUnit>=8)node(svg,'path',{d,fill:'none',stroke:visual?.stroke||'#477963','stroke-width':visual?1.2:.65,'vector-effect':'non-scaling-stroke','stroke-dasharray':visual?.dash||'4 5'},group);
  }
  // Hidden portions are a symbolic centreline over the upper tube. Keeping the
  // same coordinates is essential: a level change never shifts the plan drawing.
  for(const [i,entry]of visibility.entries())for(const interval of entry.hidden){node(svg,'path',{'data-spatial-hidden':'L'+(i+1),d:polyline(interval.map(t=>mix(projected.lines[i].start,projected.lines[i].end,t)),P),fill:'none',stroke:'#426b63','stroke-width':1.5,'vector-effect':'non-scaling-stroke','stroke-dasharray':'4 4'},group);}
 }
 
-function paintAnnotations(frame,group,camera,{format=String,translate=s=>s,onEdit=()=>{},onEndpoint=()=>{},onJoint=()=>{},interactive=true}={}){
+function paintAnnotations(frame,group,camera,{format=String,formatAngle=format,translate=s=>s,onEdit=()=>{},onEndpoint=()=>{},onJoint=()=>{},interactive=true}={}){
  const {svg,geometry:g,settings,projected,P,scale}=frame,density=camera.pixelsPerUnit||1,width=camera.screenWidth||camera.width,height=camera.screenHeight||camera.height;
  const toScreen=p=>[(p[0]-camera.x)*density+width/2,(p[1]-camera.y)*density+height/2],project=p=>toScreen(P(p));
  const topLeft=[camera.x-width/2/density,camera.y-height/2/density];group.setAttribute('transform',`translate(${topLeft[0]} ${topLeft[1]}) scale(${1/density})`);
@@ -277,9 +279,9 @@ function paintAnnotations(frame,group,camera,{format=String,translate=s=>s,onEdi
  for(const [index,arc]of projected.arcs.entries()){
   const eligibility=classification.arcs[index];if(!eligibility.annotate)continue;
   let p=project(eligibility.anchor);if(settings.labelMode==='tap'&&!inView(p,width,height,0)){const visiblePoint=arc.samples.find(point=>inView(project(point),width,height,8));if(visiblePoint)p=project(visiblePoint);}if(!inView(p,width,height,0))continue;
-  const id=bendId(g,index),detail=settings.labelMode==='tap',original=g.arcs[index],text=id+(detail?' · '+format(Math.abs(original.turn))+'°':'');
+  const id=bendId(g,index),detail=settings.labelMode==='tap',original=g.arcs[index],visual=bendVisual(original.turn),text=id,angleText=formatAngle(Math.abs(original.turn))+'°',bendText=visual.standard?angleText:translate('SPECIAL')+' · '+angleText,accessibleLabel=bendAccessibleLabel(id,original.turn,{format:formatAngle,special:translate('SPECIAL')});
   const z0=original.samples[0][2]-heightZero,z1=original.samples.at(-1)[2]-heightZero,heightText=detail?'H '+signedHeight(z0,format)+(Math.abs(z1-z0)>1e-6?' → '+signedHeight(z1,format):'')+' mm':null;
-  items.push({id,type:'angle',index,a:p,b:p,text,heightText,width:Math.max(36,Math.max(text.length*8,heightText?heightText.length*6.8:0)+16)*labelScale,height:(heightText?40:26)*labelScale,angle:0,priority:selectedPart(settings.selected,'angle',index)?0:3});
+  items.push({id,type:'angle',index,a:p,b:p,text,bendText,heightText,visual,accessibleLabel,width:Math.max(42,Math.max(text.length*8,bendText.length*6.8,heightText?heightText.length*6.8:0)+16)*labelScale,height:(heightText?58:42)*labelScale,angle:0,priority:selectedPart(settings.selected,'angle',index)?0:3});
  }
 
  for(const transition of settings.labelMode==='tap'?[]:settings.layerSelection?.transitions||[]){
@@ -297,18 +299,21 @@ function paintAnnotations(frame,group,camera,{format=String,translate=s=>s,onEdi
  const placed=placeDimensionLabels(items,obstacles,{x:8,y:8,w:width-16,h:height-16},{allowOmissions:true,localFallback:items.length<45,acceptCandidate:c=>c.box.x>=8&&c.box.y>=8&&c.box.x+c.box.w<=width-8&&c.box.y+c.box.h<=height-8&&Math.hypot(c.x-(c.a[0]+c.b[0])/2,c.y-(c.a[1]+c.b[1])/2)<=110*labelScale});
  const heightDatumLabel=settings.heightDatumLabel??translate('Højde fra A');
  for(const label of placed){
-  const isBend=label.type==='angle',anchor=[(label.a[0]+label.b[0])/2,(label.a[1]+label.b[1])/2],selected=selectedPart(settings.selected,label.type,label.index),dx=anchor[0]-label.x,dy=anchor[1]-label.y,factor=Math.min(1,label.width/2/Math.max(EPS,Math.abs(dx)),label.height/2/Math.max(EPS,Math.abs(dy)));
-  node(svg,'line',{x1:anchor[0],y1:anchor[1],x2:label.x+dx*factor,y2:label.y+dy*factor,stroke:isBend?'#b9783c':'#8ba699','stroke-width':1},guides);
-  const labelName=label.type==='length'&&!settings.showReferenceIds?(label.accessibleId||label.id)+' · '+label.text:label.text,attrs={'data-focus-key':label.id,'data-reference':label.id,'data-spatial-label':label.id,'aria-label':labelName+(label.heightText?' · '+heightDatumLabel+' · '+label.heightText:'')};
+  const isBend=label.type==='angle',visual=isBend?label.visual:null,anchor=[(label.a[0]+label.b[0])/2,(label.a[1]+label.b[1])/2],selected=selectedPart(settings.selected,label.type,label.index),dx=anchor[0]-label.x,dy=anchor[1]-label.y,factor=Math.min(1,label.width/2/Math.max(EPS,Math.abs(dx)),label.height/2/Math.max(EPS,Math.abs(dy)));
+  node(svg,'line',{x1:anchor[0],y1:anchor[1],x2:label.x+dx*factor,y2:label.y+dy*factor,stroke:visual?.stroke||'#8ba699','stroke-width':isBend?1.25:1},guides);
+  const labelName=isBend?label.accessibleLabel:label.type==='length'&&!settings.showReferenceIds?(label.accessibleId||label.id)+' · '+label.text:label.text,attrs={'data-focus-key':label.id,'data-reference':label.id,'data-spatial-label':label.id,'aria-label':labelName+(label.heightText?' · '+heightDatumLabel+' · '+label.heightText:'')};
   if(label.type==='length')attrs['data-length']=label.id;else if(label.type==='angle')attrs['data-bend-id']=label.id;else attrs['data-spatial-layer-transition-label']=label.id;
-  const item=node(svg,'g',attrs,labels);node(svg,'title',{},item,attrs['aria-label']);node(svg,'rect',{x:label.x-label.width/2,y:label.y-label.height/2,width:label.width,height:label.height,rx:isBend?13:5,fill:selected?'#fff0d9':isBend?'#fff4e8':'#fff',stroke:selected?'#b16a14':isBend?'#b9783c':'#b7c9be','stroke-width':selected?1.7:.8},item);
-  node(svg,'text',{x:label.x,y:label.y+(label.dimensionText?-11:label.heightText?-3:4.5)*labelScale,'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':(isBend?13:12)*labelScale,'font-weight':600,fill:isBend?'#994c0c':'#176748'},item,label.text);
+  if(isBend){attrs['data-bend-code']=visual.key;attrs['data-bend-kind']=visual.standard?'standard':'special';}
+  const item=node(svg,'g',attrs,labels);node(svg,'title',{},item,attrs['aria-label']);const box={x:label.x-label.width/2,y:label.y-label.height/2,width:label.width,height:label.height,rx:isBend?12:5,fill:visual?.fill||'#fff',stroke:visual?.stroke||'#b7c9be','stroke-width':selected?2.4:isBend?1.2:.8};if(visual?.dash)box['stroke-dasharray']=visual.dash;node(svg,'rect',box,item);
+  node(svg,'text',{x:label.x,y:label.y+(isBend?(label.heightText?-12:-4):(label.dimensionText?-11:label.heightText?-3:4.5))*labelScale,'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':(isBend?13:12)*labelScale,'font-weight':isBend?700:600,fill:visual?.text||'#176748'},item,label.text);
+  if(isBend)node(svg,'text',{'data-bend-angle':label.id,x:label.x,y:label.y+(label.heightText?5:13)*labelScale,'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':10.5*labelScale,'font-weight':600,fill:visual.text},item,label.bendText);
   if(label.dimensionText)node(svg,'text',{'data-spatial-input-dimension':label.id,x:label.x,y:label.y+4*labelScale,'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':11*labelScale,fill:'#176748'},item,label.dimensionText);
-  if(label.heightText)node(svg,'text',{'data-height-label':label.id,'aria-label':heightDatumLabel+' · '+label.heightText,x:label.x,y:label.y+(label.dimensionText?19:12)*labelScale,'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':10.5*labelScale,fill:'#55776a'},item,label.heightText);
+  if(label.heightText)node(svg,'text',{'data-height-label':label.id,'aria-label':heightDatumLabel+' · '+label.heightText,x:label.x,y:label.y+(isBend?21:label.dimensionText?19:12)*labelScale,'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':10.5*labelScale,fill:'#55776a'},item,label.heightText);
   if(label.type!=='transition')editable(item,label.type,label.index);
  }
  for(const [index,letter]of ['A','B'].entries()){
   const displayLabel=settings.endpointLabels?.[index]||letter,staticEndpointLabel=displayLabel==='K'?'K · '+translate('fysisk kapende'):displayLabel.startsWith('S')?displayLabel+' · '+translate('DELING'):displayLabel;
+	 if(!interactive&&displayLabel.startsWith('S'))continue;
   const p=endpointPositions[index];if(!p||!inView(p,width,height))continue;
   const same=endpointPositions.length===2&&endpointPositions.every(Boolean)&&distance(...endpointPositions)<35,offset=same?(index===0?-18:18):0;
   if(offset)node(svg,'line',{x1:p[0],y1:p[1],x2:p[0]+offset,y2:p[1],stroke:'#416b60','stroke-width':1},guides);
@@ -316,16 +321,16 @@ function paintAnnotations(frame,group,camera,{format=String,translate=s=>s,onEdi
   node(svg,'circle',{cx:p[0]+offset,cy:p[1],r:22,fill:'transparent'},endpoint);node(svg,'circle',{cx:p[0]+offset,cy:p[1],r:15,fill:letter===settings.end?'#16815d':'#183c36',stroke:'#fff','stroke-width':2.5},endpoint);node(svg,'text',{x:p[0]+offset,y:p[1]+4.5,'text-anchor':'middle',fill:'#fff','font-size':displayLabel.length>2?10:13,'font-weight':700},endpoint,displayLabel);
   if(interactive){endpoint.setAttribute('role','button');endpoint.setAttribute('tabindex','0');endpoint.onclick=event=>{event.stopPropagation?.();onEndpoint(letter);};endpoint.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onEndpoint(letter);}};}
  }
- for(const joint of settings.joints||[]){
+ for(const [jointIndex,joint]of (settings.joints||[]).entries()){
   if(settings.layerSelection&&!settings.layerSelection.lines[joint.lineIndex])continue;
-  const line=g.lines[joint.lineIndex];if(!line)continue;
-  const fraction=joint.distance/line.length,point=project(mix(line.start,line.end,fraction));if(!inView(point,width,height,joint.workLabel?70:28))continue;
-  const reference=lineId(g,joint.lineIndex),marker=node(svg,'g',{'data-joint':joint.id,'data-focus-key':'joint:'+joint.id,class:'joint-marker'+(joint.workLabel?' joint-division-marker':''),'aria-label':(joint.workLabel||joint.id)+' · '+reference+' · '+format(joint.distance)+' mm'},labels);
-  if(joint.workLabel){
-   const a=project(line.start),b=project(line.end),projectedLength=Math.hypot(b[0]-a[0],b[1]-a[1]),collapsed=projectedLength<EPS,n=collapsed?[0,0]:[-(b[1]-a[1])/projectedLength,(b[0]-a[0])/projectedLength],text=joint.workLabel,pillWidth=Math.max(86,text.length*7+20),side=point[0]>width*.58?-1:1,lane=joint.workLane??0,laneOffset=(lane%2?-1:1)*(28+Math.floor(lane/2)*28),labelX=Math.max(pillWidth/2+8,Math.min(width-pillWidth/2-8,point[0]+side*(pillWidth/2+24))),labelY=Math.max(18,Math.min(height-18,point[1]-laneOffset));
-   if(collapsed){node(svg,'circle',{'data-division-symbol':'end-on',cx:point[0],cy:point[1],r:15,fill:'none',stroke:'#ae5c15','stroke-width':2,'stroke-dasharray':'4 3'},marker);node(svg,'path',{d:`M ${point[0]-7} ${point[1]-7} L ${point[0]+7} ${point[1]+7} M ${point[0]-7} ${point[1]+7} L ${point[0]+7} ${point[1]-7}`,stroke:'#ae5c15','stroke-width':1.5,fill:'none'},marker);}else node(svg,'line',{'data-division-symbol':'line',x1:point[0]-n[0]*24,y1:point[1]-n[1]*24,x2:point[0]+n[0]*24,y2:point[1]+n[1]*24,stroke:'#ae5c15','stroke-width':2,'stroke-dasharray':'5 3'},marker);
-   node(svg,'line',{x1:point[0],y1:point[1],x2:labelX-side*pillWidth/2,y2:labelY,stroke:'#ae5c15','stroke-width':1},marker);node(svg,'rect',{x:labelX-pillWidth/2,y:labelY-12,width:pillWidth,height:24,rx:12,fill:'#fff4e8',stroke:'#ae5c15','stroke-width':1.2},marker);node(svg,'text',{x:labelX,y:labelY+4,'text-anchor':'middle','font-size':11,'font-weight':700},marker,text);
-  }else{node(svg,'path',{d:`M ${point[0]-8} ${point[1]-8} L ${point[0]+8} ${point[1]+8} M ${point[0]-8} ${point[1]+8} L ${point[0]+8} ${point[1]-8}`},marker);node(svg,'circle',{cx:point[0]+18,cy:point[1]-18,r:11},marker);node(svg,'text',{x:point[0]+18,y:point[1]-14,'text-anchor':'middle','font-size':11},marker,joint.id);}
+  const originalLine=g.lines[joint.lineIndex],projectedLine=projected.lines[joint.lineIndex];if(!originalLine||!projectedLine)continue;
+  const fraction=joint.distance/originalLine.length,projectedPoint=mix(projectedLine.start,projectedLine.end,fraction),point=project(projectedPoint);if(!inView(point,width,height,72))continue;
+  const a=project(projectedLine.start),b=project(projectedLine.end),projectedLength=Math.hypot(b[0]-a[0],b[1]-a[1]),collapsed=projectedLength<10,u=collapsed?[1,0]:[(b[0]-a[0])/projectedLength,(b[1]-a[1])/projectedLength],n=[-u[1],u[0]],text=joint.workLabel||joint.id+' · '+translate('DELING'),pillWidth=Math.max(96,text.length*7+20),side=point[0]>width*.58?-1:1,lane=joint.workLane??jointIndex,laneOffset=(lane%2?-1:1)*(30+Math.floor(lane/2)*28),labelX=Math.max(pillWidth/2+8,Math.min(width-pillWidth/2-8,point[0]+side*(pillWidth/2+26))),labelY=Math.max(18,Math.min(height-18,point[1]-laneOffset)),hidden=!classification.isExposed(projectedPoint,'L'+joint.lineIndex),reference=lineId(g,joint.lineIndex),accessible=text+' · '+reference+' · '+format(joint.distance)+' mm'+(hidden?' · '+translate('Skjult rørstykke'):''),marker=node(svg,'g',{'data-joint':joint.id,'data-focus-key':'joint:'+joint.id,'data-joint-anchor-x':point[0],'data-joint-anchor-y':point[1],'data-joint-occluded':String(hidden),class:'joint-marker joint-division-marker','aria-label':accessible},labels);
+  node(svg,'rect',{x:point[0]-22,y:point[1]-22,width:44,height:44,fill:'transparent','pointer-events':interactive?'all':'none'},marker);
+  if(collapsed){
+   node(svg,'circle',{cx:point[0],cy:point[1],r:16,fill:'none',stroke:'#fff','stroke-width':7},marker);node(svg,'circle',{'data-division-symbol':'end-on',cx:point[0],cy:point[1],r:16,fill:hidden?'#fff':'#FFF0EB',stroke:'#A73622','stroke-width':3,'stroke-dasharray':hidden?'3 2':'none'},marker);node(svg,'path',{d:`M ${point[0]-7} ${point[1]-7} L ${point[0]+7} ${point[1]+7} M ${point[0]-7} ${point[1]+7} L ${point[0]+7} ${point[1]-7}`,stroke:'#A73622','stroke-width':2,fill:'none'},marker);
+  }else for(const offset of [-4,4]){const center=[point[0]+u[0]*offset,point[1]+u[1]*offset];node(svg,'line',{x1:center[0]-n[0]*24,y1:center[1]-n[1]*24,x2:center[0]+n[0]*24,y2:center[1]+n[1]*24,stroke:'#fff','stroke-width':7,'stroke-linecap':'round'},marker);node(svg,'line',{'data-division-symbol':'cut-band',x1:center[0]-n[0]*24,y1:center[1]-n[1]*24,x2:center[0]+n[0]*24,y2:center[1]+n[1]*24,stroke:'#A73622','stroke-width':3,'stroke-linecap':'round','stroke-dasharray':hidden?'3 2':'none'},marker);}
+  node(svg,'line',{x1:point[0],y1:point[1],x2:labelX-side*pillWidth/2,y2:labelY,stroke:'#A73622','stroke-width':1.5,'stroke-dasharray':'4 3'},marker);node(svg,'rect',{x:labelX-pillWidth/2,y:labelY-13,width:pillWidth,height:26,rx:13,fill:'#FFF0EB',stroke:'#A73622','stroke-width':1.7},marker);node(svg,'text',{x:labelX,y:labelY+4,'text-anchor':'middle','font-size':11,'font-weight':700,fill:'#702315'},marker,text);
   node(svg,'title',{},marker,marker.getAttribute('aria-label'));if(interactive){marker.setAttribute('role','button');marker.setAttribute('tabindex','0');marker.onclick=event=>{event.stopPropagation?.();onJoint(joint.sourceIndex);};marker.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onJoint(joint.sourceIndex);}};}
  }
  // The first bend's0° datum is physically anchored at A and projected
@@ -350,7 +355,7 @@ function paintAnnotations(frame,group,camera,{format=String,translate=s=>s,onEdi
 }
 
 /** Separate SVG from the planar editor: hidden views do not share a camera. */
-export function createSpatialPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=String,translate=s=>s,onEdit=()=>{},onEndpoint=()=>{},onJoint=()=>{},onPick,onSelect}={}){
+export function createSpatialPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=String,formatAngle=format,translate=s=>s,onEdit=()=>{},onEndpoint=()=>{},onJoint=()=>{},onPick,onSelect}={}){
  let frame=null,lastView=null,orbitMode=false;
  const orbit={yaw:Math.PI/4,pitch:Math.atan(1/Math.SQRT2)};
  const viewport=createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange:update,onTap:tap,onSingleDrag:orbitDrag,enabled:()=>!svg.hasAttribute('hidden')});
@@ -373,7 +378,7 @@ export function createSpatialPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=S
   const bounds=svg.getBoundingClientRect?.(),screenWidth=Number(bounds?.width)||camera.width,screenHeight=Number(bounds?.height)||camera.height;
   const focused=svg.ownerDocument.activeElement,focusKey=frame.annotations.contains?.(focused)?focused?.getAttribute?.('data-focus-key'):null;
   frame.pipes.replaceChildren();paintTube(frame,frame.pipes,camera.pixelsPerUnit,frame.preview);
-  frame.annotations.replaceChildren();paintAnnotations(frame,frame.annotations,{...camera,screenWidth,screenHeight},{format,translate,onEdit,onEndpoint,onJoint});
+  frame.annotations.replaceChildren();paintAnnotations(frame,frame.annotations,{...camera,screenWidth,screenHeight},{format,formatAngle,translate,onEdit,onEndpoint,onJoint});
   svg.setAttribute('data-detail-zoom',String(camera.zoom));svg.setAttribute('data-world-diameter',String(frame.settings.diameter));svg.setAttribute('data-world-scale',String(frame.scale));
   if(focusKey){const next=[...frame.annotations.querySelectorAll('[data-focus-key]')].find(item=>item.getAttribute('data-focus-key')===focusKey);(next||svg).focus?.({preventScroll:true});}
  }
@@ -422,13 +427,13 @@ function installWorkSelection(svg,frame,{labelMode,onSelect}){
 /** A single large workshop view preserves the old drawing's visual hierarchy.
  * Other projections are chosen explicitly, rather than compressed beside it.
  * Geometry stays exact; the overview line weight is deliberately legible. */
-export function renderSpatialWorkDrawing(svg,geometry,{diameter=12,radius=38,format=String,translate=s=>s,view='iso',layerHeight=null,labelMode='all',selected=null,joints=[],endpointLabels=null,heightDatumLabel=null,showReferenceIds=false,onSelect,width=900,height=1200}={}){
+export function renderSpatialWorkDrawing(svg,geometry,{diameter=12,radius=38,format=String,formatAngle=format,translate=s=>s,view='iso',layerHeight=null,labelMode='all',selected=null,joints=[],endpointLabels=null,heightDatumLabel=null,showReferenceIds=false,onSelect,width=900,height=1200}={}){
  const layerSelection=view==='top'?spatialLayerSelection(geometry,layerHeight):null,focused=svg.ownerDocument.activeElement,focusId=svg.contains?.(focused)?focused?.getAttribute?.('data-spatial-selectable'):null;
  svg.replaceChildren();svg.removeAttribute('data-inline-bends');svg.removeAttribute('data-total-bends');svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.setAttribute('data-spatial-work','true');svg.setAttribute('data-spatial-work-view',view);svg.setAttribute('data-spatial-work-layer',layerSelection?String(layerSelection.height):'all');
  const title=translate(view==='top'?'Ovenfra':view==='front'?'Forfra':view==='side'?'Fra siden':'3D-overblik');
  node(svg,'text',{'data-work-view-title':'',x:30,y:38,'font-family':'var(--app-font, sans-serif)','font-size':22,'font-weight':600,fill:'#183c36'},svg,title+(layerSelection?' · H '+signedHeight(layerSelection.height,format)+' mm':''));
  const frame=layoutFrame(svg,geometry,{diameter,radius,view,end:'B',annotationScale:1.5,overviewStroke:10,compactOverview:true,layerSelection,labelMode,selected,joints,endpointLabels,heightDatumLabel,showReferenceIds},width,height-56);
  frame.P=((original)=>p=>{const q=original(p);return[q[0],q[1]+56,q[2]];})(frame.P);
- const pipe=node(svg,'g',{'data-work-view':view}),annotations=node(svg,'g',{'data-work-view-annotations':view});paintTube(frame,pipe,1);paintAnnotations(frame,annotations,{x:width/2,y:height/2,width,height,pixelsPerUnit:1},{format,translate,interactive:false});installWorkSelection(svg,frame,{labelMode,onSelect});
+ const pipe=node(svg,'g',{'data-work-view':view}),annotations=node(svg,'g',{'data-work-view-annotations':view});paintTube(frame,pipe,1);paintAnnotations(frame,annotations,{x:width/2,y:height/2,width,height,pixelsPerUnit:1},{format,formatAngle,translate,interactive:false});installWorkSelection(svg,frame,{labelMode,onSelect});
  if(focusId){const focus=[...svg.querySelectorAll('[data-spatial-selectable]')].find(part=>part.getAttribute('data-spatial-selectable')===focusId);focus?.focus?.({preventScroll:true});}
 }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import {spatialLayerSelection} from './spatial-layers.mjs?v=41';
-import {geometry3D} from './spatial-geometry.mjs?v=41';
-import {projectSpatialPoint,projectSpatialGeometry,spatialArcSamples,spatialLineVisibility,pickSpatialParts,spatialRiseLabelData,classifySpatialProjection,renderSpatialWorkDrawing} from './spatial-drawing.mjs?v=41';
+import {spatialLayerSelection} from './spatial-layers.mjs?v=42';
+import {geometry3D} from './spatial-geometry.mjs?v=42';
+import {projectSpatialPoint,projectSpatialGeometry,spatialArcSamples,spatialLineVisibility,pickSpatialParts,spatialRiseLabelData,classifySpatialProjection,renderSpatialWorkDrawing} from './spatial-drawing.mjs?v=42';
 
 const close=(a,b,epsilon=1e-7)=>assert(Math.abs(a-b)<=epsilon,`${a} != ${b}`);
 assert.deepEqual(projectSpatialPoint([12,34,56],'top'),[12,34,56]);
@@ -155,10 +155,33 @@ class FakeSvgNode{
 }
 const fakeDocument={activeElement:null,createElementNS(namespace,name){return new FakeSvgNode(name,fakeDocument);}},staticSvg=new FakeSvgNode('svg',fakeDocument),endOnProject={radius:38,heading:0,measurementMode:'tangent',lengths:[500],turns:[],bendRotations:[],startFrame:{tangent:[0,0,1],normal:[1,0,0]}},endOnGeometry=geometry3D(endOnProject);
 endOnGeometry.lines[0].displayId='L7';
-renderSpatialWorkDrawing(staticSvg,endOnGeometry,{view:'top',joints:[{id:'S3',lineIndex:0,distance:250,workLabel:'S3 · DELING'}],endpointLabels:['K','S3'],showReferenceIds:true,width:900,height:720});
+renderSpatialWorkDrawing(staticSvg,endOnGeometry,{view:'top',joints:[{id:'S3',lineIndex:0,distance:500,workLabel:'S3 · DELING',atEndpoint:true}],endpointLabels:['K','S3'],showReferenceIds:true,width:900,height:720});
 const rendered=[];for(const visit of staticSvg.children){const stack=[visit];while(stack.length){const item=stack.pop();rendered.push(item);stack.push(...item.children);}}
 assert(rendered.some(item=>item.getAttribute('data-spatial-part')==='L7'),'Static renderer preserves original display IDs');
 assert(rendered.some(item=>item.getAttribute('data-division-symbol')==='end-on'),'End-on split keeps a visible circle/cross symbol');
-assert.deepEqual(Object.fromEntries(rendered.filter(item=>item.getAttribute('data-endpoint')).map(item=>[item.getAttribute('data-endpoint'),item.getAttribute('aria-label')])),{A:'K · fysisk kapende',B:'S3 · DELING'});
-assert.match(rendered.find(item=>item.getAttribute('data-joint')==='S3').getAttribute('aria-label'),/S3 · DELING · L7 · 250 mm/);
-console.log('Static spatial work SVG: original IDs, endpoint labels and end-on split symbol PASS');
+assert.deepEqual(Object.fromEntries(rendered.filter(item=>item.getAttribute('data-endpoint')).map(item=>[item.getAttribute('data-endpoint'),item.getAttribute('aria-label')])),{A:'K · fysisk kapende'},'A division endpoint uses the prominent split symbol instead of the generic green endpoint badge');
+assert.match(rendered.find(item=>item.getAttribute('data-joint')==='S3').getAttribute('aria-label'),/S3 · DELING · L7 · 500 mm/);
+console.log('Static spatial work SVG: original IDs, physical cut endpoint and prominent end-on split symbol PASS');
+
+// A split on a true 3D line must be projected before its screen marker is
+// placed. Check every fixed/ISO view and verify that the anchor lies on the
+// rendered straight rather than merely existing somewhere in the viewport.
+const rootNodes=root=>{const all=[],stack=[...root.children];while(stack.length){const item=stack.pop();all.push(item);stack.push(...item.children);}return all;};
+const root6=Math.sqrt(6),root5=Math.sqrt(5),joint3D=geometry3D({radius:38,heading:0,measurementMode:'tangent',lengths:[600],turns:[],bendRotations:[],startFrame:{tangent:[2/root6,1/root6,1/root6],normal:[1/root5,-2/root5,0]}});
+for(const view of ['top','front','side','iso']){
+ const scene=new FakeSvgNode('svg',fakeDocument);renderSpatialWorkDrawing(scene,joint3D,{view,joints:[{id:'S1',lineIndex:0,distance:270}],width:900,height:720});const nodes=rootNodes(scene),marker=nodes.find(item=>item.getAttribute('data-joint')==='S1'),pipe=nodes.find(item=>item.getAttribute('data-spatial-part')==='L1');
+ assert(marker,`${view}: split marker is not culled`);assert(nodes.some(item=>item.getAttribute('data-division-symbol')==='cut-band'),`${view}: split uses the prominent cut band`);
+ const point=[Number(marker.getAttribute('data-joint-anchor-x')),Number(marker.getAttribute('data-joint-anchor-y'))],numbers=(pipe.getAttribute('d').match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi)||[]).map(Number),a=numbers.slice(0,2),b=numbers.slice(-2),dx=b[0]-a[0],dy=b[1]-a[1],fraction=((point[0]-a[0])*dx+(point[1]-a[1])*dy)/(dx*dx+dy*dy),nearest=[a[0]+dx*fraction,a[1]+dy*fraction];
+ close(Math.hypot(point[0]-nearest[0],point[1]-nearest[1]),0,1e-6);assert(point.every(Number.isFinite));assert(point[0]>=0&&point[0]<=900&&point[1]>=0&&point[1]<=720);
+ assert.match(marker.getAttribute('aria-label'),/S1 · DELING · L1 · 270 mm/);
+}
+console.log('Static spatial split projection: top/front/side/ISO anchors stay on the real projected line with a prominent live/work marker PASS');
+
+const colored=geometry3D({radius:38,heading:0,measurementMode:'tangent',lengths:[500,450,420,380],turns:[45,37,90],bendRotations:[0,0,0]}),colorSvg=new FakeSvgNode('svg',fakeDocument);
+renderSpatialWorkDrawing(colorSvg,colored,{view:'top',formatAngle:value=>String(value),translate:value=>value,width:900,height:720});
+const colorNodes=rootNodes(colorSvg),tokens=new Set(colorNodes.map(item=>item.getAttribute('data-bend-color')).filter(Boolean));
+assert(tokens.has('45'));assert(tokens.has('90'));assert(tokens.has('special'));
+assert(colorNodes.some(item=>item.getAttribute('data-bend-code')==='45'));
+assert(colorNodes.some(item=>item.getAttribute('data-bend-kind')==='special'));
+assert(colorNodes.some(item=>item.getAttribute('data-bend-angle')==='B2'&&item.textContent==='SPECIAL · 37°'));
+console.log('Static spatial bend colors: blue 45°, dark-green 90° and explicit non-color SPECIAL label PASS');

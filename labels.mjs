@@ -1,4 +1,4 @@
-import {rectPolygon,polygonsOverlap} from './dimension-layout.mjs?v=41';
+import {rectPolygon,polygonsOverlap} from './dimension-layout.mjs?v=42';
 
 const bounds=polygon=>({minX:Math.min(...polygon.map(p=>p[0])),maxX:Math.max(...polygon.map(p=>p[0])),minY:Math.min(...polygon.map(p=>p[1])),maxY:Math.max(...polygon.map(p=>p[1]))});
 const inside=(polygon,width,height,padding)=>polygon.every(([x,y])=>x>=padding&&x<=width-padding&&y>=padding&&y<=height-padding);
@@ -44,7 +44,6 @@ export function leaderCrossesPipe(a,b,pipe,anchorTolerance=2.5) {
 export function referenceLayout(items,{width=900,height=540,fontSize=14,obstacles=[],pipe=[],maxLeader=28,padding=8,selectedIndex=-1}={}) {
  items=items.map((item,index)=>({...item,index:item.index??item.order??index,order:item.order??index}));
  const shape=p=>({polygon:p,box:bounds(p)}),fixed=obstacles.map(shape),pipeShapes=pipe.map(p=>({...shape(p.polygon||p),index:p.index})),occupied=[...fixed,...pipeShapes],labels=[],unplaced=[];
- const badgeHeight=fontSize+10;
  const priority=item=>items.reduce((n,p)=>p.index===item.index?n:n+100/Math.max(8,distance([item.x,item.y],[p.x,p.y])),0)+fixed.reduce((n,p)=>n+160/Math.max(4,distance([item.x,item.y],[(p.box.minX+p.box.maxX)/2,(p.box.minY+p.box.maxY)/2])-Math.max(p.box.maxX-p.box.minX,p.box.maxY-p.box.minY)/2),0);
  const priorities=new Map(items.map(item=>[item,priority(item)]));
  const sorted=[...items].sort((a,b)=>(a.index===selectedIndex?-1:b.index===selectedIndex?1:0)||priorities.get(b)-priorities.get(a)||(a.order??a.index??0)-(b.order??b.index??0));
@@ -52,7 +51,7 @@ export function referenceLayout(items,{width=900,height=540,fontSize=14,obstacle
  let attempted=0;
  for(const item of sorted) {
   if(attempted++>=limit){unplaced.push({...item});continue;}
-  const text=item.id||'B'+(item.index+1),badgeWidth=Math.max(fontSize*2.35,String(text).length*fontSize*.64+10),origin=[item.x,item.y];
+  const id=item.id||'B'+(item.index+1),labelLines=(Array.isArray(item.labelLines)&&item.labelLines.length?item.labelLines:[item.labelText||id]).map(String),badgeWidth=Math.max(fontSize*2.35,...labelLines.map(text=>text.length*fontSize*.64+10)),badgeHeight=fontSize*labelLines.length+8,origin=[item.x,item.y];
   const preferred=item.outward?Math.atan2(item.outward[1],item.outward[0]):-Math.PI/2;
   const fine=items.length<=32;
   const angles=fine?[0,...Array.from({length:15},(_,i)=>[(i+1)*Math.PI/16,-(i+1)*Math.PI/16]).flat(),Math.PI]:[0,Math.PI,-Math.PI/2,Math.PI/2,-Math.PI/4,Math.PI/4,-3*Math.PI/4,3*Math.PI/4,-Math.PI/8,Math.PI/8,-3*Math.PI/8,3*Math.PI/8,-5*Math.PI/8,5*Math.PI/8,-7*Math.PI/8,7*Math.PI/8];
@@ -77,7 +76,7 @@ export function referenceLayout(items,{width=900,height=540,fontSize=14,obstacle
    if(!leavesOwn)continue;
    if(items.some(other=>other.index!==item.index&&distance([other.x,other.y],end)<4))continue;
    const score=radius+Math.abs(offset)*1.2;
-   if(!best||score<best.score)best={...item,id:text,labelX,labelY,width:badgeWidth,height:badgeHeight,fontSize,polygon,box:candidate.box,leader:[origin,end],leaderLength,score};
+   if(!best||score<best.score)best={...item,id,labelLines,labelX,labelY,width:badgeWidth,height:badgeHeight,fontSize,polygon,box:candidate.box,leader:[origin,end],leaderLength,score};
   }
   if(best){delete best.score;labels.push(best);occupied.push(shape(best.polygon));}else unplaced.push({...item});
  }
@@ -86,12 +85,14 @@ export function referenceLayout(items,{width=900,height=540,fontSize=14,obstacle
 }
 
 export function bendReferenceLayout(arcs,project,options={}) {
+ const {labelFor,...layoutOptions}=options;
  const refs=arcs.map((arc,index)=>{
   const midpoint=arc.samples[Math.floor((arc.samples.length-1)/2)],p=project(midpoint),center=arc.center?project(arc.center):null;
   const length=center?distance(p,center):0;
-  return {type:'angle',index,order:index,x:p[0],y:p[1],id:arc.displayId||'B'+(index+1),outward:length?[(p[0]-center[0])/length,(p[1]-center[1])/length]:undefined};
+  const id=arc.displayId||'B'+(index+1),label=labelFor?.(arc,index,id);
+  return {type:'angle',index,order:index,x:p[0],y:p[1],id,...(Array.isArray(label)?{labelLines:label}:label?{labelText:String(label)}:{}),outward:length?[(p[0]-center[0])/length,(p[1]-center[1])/length]:undefined};
  });
- return {...referenceLayout(refs,options),anchors:refs,project};
+ return {...referenceLayout(refs,layoutOptions),anchors:refs,project};
 }
 // Rotate only the view, never the pipe model. Prefer a wide, readable fit.
 export function bestDrawingAngle(points,width=460,height=300){

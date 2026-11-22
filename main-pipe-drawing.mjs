@@ -1,8 +1,9 @@
-import {createWallViewport} from './wall-viewport.mjs?v=41';
-import {mainPipeToSvgPath,pipeDetailStrokeWidths} from './main-pipe-detail.mjs?v=41';
-import {layoutMainDetailAnnotations} from './main-detail-annotations.mjs?v=41';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=41';
-import {referenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=41';
+import {createWallViewport} from './wall-viewport.mjs?v=42';
+import {mainPipeToSvgPath,pipeDetailStrokeWidths} from './main-pipe-detail.mjs?v=42';
+import {layoutMainDetailAnnotations} from './main-detail-annotations.mjs?v=42';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=42';
+import {referenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=42';
+import {bendVisual,bendBadgeLines,bendAccessibleLabel} from './bend-visuals.mjs?v=42';
 
 const NS='http://www.w3.org/2000/svg';
 const rect=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
@@ -23,7 +24,7 @@ function visibleLine(a,b,width,height,padding=24){
 
 /** The ordinary editor's camera changes physical geometry and screen labels
  * independently. A pan/zoom never rebuilds the tube or changes project data. */
-export function createMainPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=String,translate=s=>s,onEdit=()=>{},onEndpoint=()=>{},onJoint=()=>{}}){
+export function createMainPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=String,formatAngle=format,translate=s=>s,onEdit=()=>{},onEndpoint=()=>{},onJoint=()=>{}}){
  let frame=null;
  const viewport=createWallViewport({svg,zoomIn,zoomOut,fit,output,onChange:update,enabled:()=>!svg.hasAttribute('hidden')});
  function node(tag,attrs,parent,text){const item=document.createElementNS(NS,tag);for(const [key,value]of Object.entries(attrs||{}))item.setAttribute(key,String(value));if(text!==undefined)item.textContent=text;(parent||svg).append(item);return item;}
@@ -49,7 +50,7 @@ export function createMainPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=Stri
   for(const line of g.lines){const polygon=footprint(project(line.start),project(line.end),halfWidth);if(nearViewport(polygon))pipe.push({polygon});}
   g.arcs.forEach((arc,index)=>{const sampleAngle=Math.abs(arc.turn)*Math.PI/180/Math.max(1,arc.samples.length-1),step=Math.max(1,Math.min(4,Math.floor(Math.sqrt(4/Math.max(1,settings.radius*scale*density))/sampleAngle)));for(let j=0;j<arc.samples.length-1;j+=step){const next=Math.min(j+step,arc.samples.length-1),bow=settings.radius*scale*density*(1-Math.cos(sampleAngle*(next-j)/2)),polygon=footprint(project(arc.samples[j]),project(arc.samples[next]),halfWidth+bow);if(nearViewport(polygon))pipe.push({index,polygon});}});
   const endpointObstacles=[project(g.start),project(g.end)].filter(p=>inView(p,30)).map(p=>rect(p[0]-23,p[1]-23,46,46));
-  const anchors=g.arcs.map((arc,index)=>{const p=project(arc.samples[Math.floor((arc.samples.length-1)/2)]);return{type:'angle',index,order:index,x:p[0],y:p[1],id:'B'+(index+1)};}).filter(p=>inView([p.x,p.y],2));
+  const anchors=g.arcs.map((arc,index)=>{const p=project(arc.samples[Math.floor((arc.samples.length-1)/2)]),id=arc.displayId||'B'+(index+1);return{type:'angle',index,order:index,x:p[0],y:p[1],id,labelLines:bendBadgeLines(id,arc.turn,{format:formatAngle,special:translate('SPECIAL')})};}).filter(p=>inView([p.x,p.y],2));
   const layout=referenceLayout(anchors,{width,height,fontSize:13,obstacles:endpointObstacles,pipe,maxLeader:28});
   const obstacles=[...pipe.map(item=>item.polygon),...endpointObstacles,...layout.labels.map(item=>item.polygon),...layout.labels.map(item=>footprint(...item.leader,2))];
   const fontSize=14,metrics=document.createElement('canvas').getContext('2d');metrics.font=`600 ${fontSize}px ${getComputedStyle(svg).fontFamily}`;
@@ -72,12 +73,21 @@ export function createMainPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=Stri
    node('title',{},group,dim.id+' · '+dim.text+' mm');node('rect',{x:-dim.width/2,y:-dim.height/2,width:dim.width,height:dim.height,rx:4,fill:'#fff'},group);node('text',{x:0,y:fontSize*.34,'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':fontSize,'font-weight':600,fill:'#176748'},group,dim.text);editable(group,'length',dim.index);
   }
   for(const ref of layout.labels){
-   node('line',{'data-bend-leader':ref.id,x1:ref.leader[0][0],y1:ref.leader[0][1],x2:ref.leader[1][0],y2:ref.leader[1][1],stroke:'#bd763a','stroke-width':1},leaders);
-   const badge=node('g',{'data-reference':ref.id,'data-bend-id':ref.id,'data-focus-key':ref.id,class:'reference-badge','aria-label':ref.id+' · '+format(Math.abs(g.arcs[ref.index].turn))+'°'},labels);
-   node('rect',{x:ref.labelX-ref.width/2,y:ref.labelY-ref.height/2,width:ref.width,height:ref.height,rx:ref.height/2,fill:'#fff4e8',stroke:'#ae5c15','stroke-width':1},badge);node('text',{x:ref.labelX,y:ref.labelY+ref.fontSize*.34,'font-family':'var(--app-font, sans-serif)','font-size':ref.fontSize,'font-weight':600,'text-anchor':'middle',fill:'#994c0c'},badge,ref.id);node('title',{},badge,ref.id+' · '+format(Math.abs(g.arcs[ref.index].turn))+'°');editable(badge,'angle',ref.index);
+   const arc=g.arcs[ref.index],visual=bendVisual(arc.turn),accessible=bendAccessibleLabel(ref.id,arc.turn,{format:formatAngle,special:translate('SPECIAL')});
+   node('line',{'data-bend-leader':ref.id,x1:ref.leader[0][0],y1:ref.leader[0][1],x2:ref.leader[1][0],y2:ref.leader[1][1],stroke:visual.stroke,'stroke-width':1.25},leaders);
+   const badge=node('g',{'data-reference':ref.id,'data-bend-id':ref.id,'data-bend-code':visual.key,'data-bend-kind':visual.standard?'standard':'special','data-focus-key':ref.id,class:'reference-badge','aria-label':accessible},labels),box={x:ref.labelX-ref.width/2,y:ref.labelY-ref.height/2,width:ref.width,height:ref.height,rx:Math.min(12,ref.height/2),fill:visual.fill,stroke:visual.stroke,'stroke-width':visual.standard?1.2:1.8};if(visual.dash)box['stroke-dasharray']=visual.dash;node('rect',box,badge);
+   const lineHeight=ref.fontSize*1.05,first=ref.labelY-(ref.labelLines.length-1)*lineHeight/2+ref.fontSize*.34;ref.labelLines.forEach((text,index)=>node('text',{x:ref.labelX,y:first+index*lineHeight,'font-family':'var(--app-font, sans-serif)','font-size':index?ref.fontSize*.88:ref.fontSize,'font-weight':index?600:700,'text-anchor':'middle',fill:visual.text},badge,text));node('title',{},badge,accessible);editable(badge,'angle',ref.index);
   }
-  for(const ref of anchors){const anchor=node('g',{'data-bend-id':ref.id,'data-bend-anchor':ref.id,'data-focus-key':'anchor:'+ref.id,class:'bend-anchor','aria-label':ref.id+' · '+format(Math.abs(g.arcs[ref.index].turn))+'°'},labels);node('circle',{cx:ref.x,cy:ref.y,r:12,fill:'transparent'},anchor);node('circle',{'data-bend':ref.id,cx:ref.x,cy:ref.y,r:2.5,fill:'#ae5c15',stroke:'#fff','stroke-width':1},anchor);editable(anchor,'angle',ref.index);}
-  for(const joint of settings.joints||[]){const line=g.lines[joint.lineIndex];if(!line)continue;const fraction=joint.distance/line.length,world=line.start.map((value,index)=>value+(line.end[index]-value)*fraction),point=project(world);if(!inView(point,28))continue;const marker=node('g',{'data-joint':joint.id,'data-focus-key':'joint:'+joint.id,class:'joint-marker',role:'button',tabindex:0,'aria-label':joint.id+' · L'+(joint.lineIndex+1)+' · '+format(joint.distance)+' mm'},labels);node('path',{d:`M ${point[0]-8} ${point[1]-8} L ${point[0]+8} ${point[1]+8} M ${point[0]-8} ${point[1]+8} L ${point[0]+8} ${point[1]-8}`},marker);node('circle',{cx:point[0]+18,cy:point[1]-18,r:11},marker);node('text',{x:point[0]+18,y:point[1]-14,'text-anchor':'middle','font-size':11},marker,joint.id);node('title',{},marker,marker.getAttribute('aria-label'));marker.onclick=()=>onJoint(joint.sourceIndex);marker.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onJoint(joint.sourceIndex);}};}
+  for(const ref of anchors){const arc=g.arcs[ref.index],visual=bendVisual(arc.turn),accessible=bendAccessibleLabel(ref.id,arc.turn,{format:formatAngle,special:translate('SPECIAL')}),anchor=node('g',{'data-bend-id':ref.id,'data-bend-anchor':ref.id,'data-focus-key':'anchor:'+ref.id,'data-bend-code':visual.key,class:'bend-anchor','aria-label':accessible},labels);node('circle',{cx:ref.x,cy:ref.y,r:12,fill:'transparent'},anchor);node('circle',{'data-bend':ref.id,cx:ref.x,cy:ref.y,r:3,fill:visual.stroke,stroke:'#fff','stroke-width':1.2},anchor);editable(anchor,'angle',ref.index);}
+  for(const [jointIndex,joint]of (settings.joints||[]).entries()){
+   const line=g.lines[joint.lineIndex];if(!line)continue;
+   const fraction=joint.distance/line.length,world=line.start.map((value,index)=>value+(line.end[index]-value)*fraction),point=project(world);if(!inView(point,72))continue;
+   const a=project(line.start),b=project(line.end),length=Math.hypot(b[0]-a[0],b[1]-a[1])||1,u=[(b[0]-a[0])/length,(b[1]-a[1])/length],n=[-u[1],u[0]],text=joint.workLabel||joint.id+' · '+translate('DELING'),pillWidth=Math.max(96,text.length*7+20),side=point[0]>width*.58?-1:1,lane=joint.workLane??jointIndex,laneOffset=(lane%2?-1:1)*(30+Math.floor(lane/2)*28),labelX=Math.max(pillWidth/2+8,Math.min(width-pillWidth/2-8,point[0]+side*(pillWidth/2+26))),labelY=Math.max(18,Math.min(height-18,point[1]-laneOffset)),accessible=text+' · L'+(joint.lineIndex+1)+' · '+format(joint.distance)+' mm',marker=node('g',{'data-joint':joint.id,'data-focus-key':'joint:'+joint.id,class:'joint-marker joint-division-marker',role:'button',tabindex:0,'aria-label':accessible},labels);
+   node('rect',{x:point[0]-22,y:point[1]-22,width:44,height:44,fill:'transparent','pointer-events':'all'},marker);
+   for(const offset of [-4,4]){const center=[point[0]+u[0]*offset,point[1]+u[1]*offset];node('line',{x1:center[0]-n[0]*24,y1:center[1]-n[1]*24,x2:center[0]+n[0]*24,y2:center[1]+n[1]*24,stroke:'#fff','stroke-width':7,'stroke-linecap':'round'},marker);node('line',{'data-division-symbol':'cut-band',x1:center[0]-n[0]*24,y1:center[1]-n[1]*24,x2:center[0]+n[0]*24,y2:center[1]+n[1]*24,stroke:'#A73622','stroke-width':3,'stroke-linecap':'round'},marker);}
+   node('line',{x1:point[0],y1:point[1],x2:labelX-side*pillWidth/2,y2:labelY,stroke:'#A73622','stroke-width':1.5,'stroke-dasharray':'4 3'},marker);node('rect',{x:labelX-pillWidth/2,y:labelY-13,width:pillWidth,height:26,rx:13,fill:'#FFF0EB',stroke:'#A73622','stroke-width':1.7},marker);node('text',{x:labelX,y:labelY+4,'text-anchor':'middle','font-size':11,'font-weight':700,fill:'#702315'},marker,text);node('title',{},marker,accessible);
+   marker.onclick=()=>onJoint(joint.sourceIndex);marker.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onJoint(joint.sourceIndex);}};
+  }
   const detail=layoutMainDetailAnnotations({geometry:g,radius:settings.radius,diameter:settings.diameter,pixelsPerMm:scale*density,zoom:state.zoom,mapPoint:project,width,height,obstacles:[...obstacles,...placed.map(dim=>dim.polygon)],format});
   for(const dimension of detail.dimensions){
    const group=node('g',{'data-detail-dimension':dimension.kind,'data-detail-value':dimension.value,'pointer-events':'none'},guides);
@@ -104,6 +114,9 @@ export function createMainPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=Stri
   const pipes=node('g',{'data-layer':'pipe'}),path=(geo,attrs,delta)=>node('path',{d:mainPipeToSvgPath(geo,{radius:settings.radius,mapPoint:P,scale,flipY:true,delta}),fill:'none','stroke-linecap':'butt','stroke-linejoin':'round',...attrs},pipes);
   if(preview){let delta=[0,0];if(settings.end==='A'){const p=preview.lines[1].start;delta=[-p[0],-p[1]];}path(preview,{'data-pipe-preview':'',stroke:'#97c6b0','stroke-width':2,'stroke-dasharray':'8 8','vector-effect':'non-scaling-stroke',opacity:.6},delta);}
   const overview=path(geometry,{'data-pipe-overview':'',stroke:'#6d9685','stroke-width':1.25,'vector-effect':'non-scaling-stroke','pointer-events':'none'}),outer=path(geometry,{'data-pipe-body':'',stroke:'#9db6ab','stroke-width':settings.diameter*scale}),inner=path(geometry,{'data-pipe-inner':'',stroke:'#deeee7'}),center=path(geometry,{'data-pipe-centerline':'',stroke:'#487b69','stroke-width':.65,'stroke-dasharray':'4 5','vector-effect':'non-scaling-stroke'});
+  for(const [index,arc]of geometry.arcs.entries()){
+   const visual=bendVisual(arc.turn),points=arc.samples.map(P),attrs={'data-bend-color':visual.key,'data-bend-kind':visual.standard?'standard':'special','data-bend-id':arc.displayId||'B'+(index+1),d:points.map((point,i)=>(i?'L':'M')+point.join(' ')).join(' '),fill:'none',stroke:visual.stroke,'stroke-width':3.2,'vector-effect':'non-scaling-stroke','stroke-linecap':'round','pointer-events':'none'};if(visual.dash)attrs['stroke-dasharray']=visual.dash;node('path',attrs,pipes);
+  }
   const highlights=geometry.lines.map((line,index)=>{const a=P(line.start),b=P(line.end);return node('line',{'data-length-id':'L'+(index+1),class:'reference-path',x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:'#278f70','stroke-width':settings.diameter*scale,'stroke-linecap':'butt','pointer-events':'none',opacity:0},pipes);});
   const annotations=node('g',{'data-layer':'annotations'});
   frame={geometry,settings:{...settings},P,scale,overview,outer,inner,center,annotations,highlights};viewport.setOnChange(update);

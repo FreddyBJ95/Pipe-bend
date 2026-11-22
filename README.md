@@ -19,6 +19,14 @@ Upload indholdet af denne mappe, **inklusive `.github`**, til roden af dit repos
 
 Appen installeres fra den HTTPS-adresse, GitHub Pages giver dig; en downloadet ZIP alene er ikke en installeret PWA.
 
+## Tydelige samlinger og bukfarver (v42)
+
+Samlinger vises nu med en markant, dobbelt delelinje og labelen `S1 · DELING` i redigeringen, arbejdsvisningen, 3D-projektionerne og udskriften. En samling, der ses direkte ind i rørenden, vises som ring med kryds. Samlingspunktet projiceres fra den faktiske 3D-linje, så det ligger korrekt i visningerne ovenfra, forfra, fra siden og i 3D-overblikket.
+
+Gængse buk har faste farver og viser stadig graden som tekst: 30° er violet, 45° blå, 60° okker og 90° mørkegrøn. Alle andre vinkler får en bordeaux, stiplet markering og labelen `SPECIAL`, så farven aldrig er den eneste information. Farver og labels går igen på selve bukket, B-mærket, referencelisterne, de flade rørtegninger og de fysiske R-rørs arbejdstegninger.
+
+Visningsvalget **Rørtegning** hedder nu **Automatisk 2D**. Det er den automatisk drejede og tilpassede tegning af et plant rør; **Ovenfra** er derimod en fast XY-projektion. Når et rør bliver rumligt, skifter appen automatisk til Ovenfra.
+
 ## Samlinger og flere fysiske rør (v41)
 
 Et samlet rørtræk kan opdeles i flere fysiske rør, når trækket er længere end den valgte rå rørlængde. Selve designgeometrien forbliver sammenhængende; samlingerne er et separat fremstillingslag og ændrer derfor ikke buk, højder eller vægforløb.
@@ -42,7 +50,7 @@ Kør `python3 -m http.server 8080` i denne mappe og åbn http://localhost:8080. 
 Gem projekt indeholder både det anvendte rør og et eventuelt uanvendt vægudkast, inklusive vægge, klammer, forhindringer, hjørnepunkter og ventende rettelser. Projektfilen beholder version 1 med et valgfrit wallDraft-felt, så ældre filer fortsat kan åbnes. Udkastet holdes adskilt fra det anvendte rør. Ved import kontrolleres både rør og udkast før erstatning; en ugyldig fil ændrer ikke det åbne projekt. Filer på op til 2 MiB kan åbnes, så også store komplette vægprojekter kan eksporteres og indlæses igen.
 
 ## Kontrol
-Kør `node test.mjs`, `node material-sections.test.mjs`, `node benders.test.mjs`, `node measurements.test.mjs`, `node displayed-marks.test.mjs`, `node project-storage.test.mjs`, `node wall-validation-status.test.mjs`, `node wall-routing.test.mjs`, `node wall-obstacle-angle.test.mjs`, `node wall-pipe-edit.test.mjs`, `node linear-pipe-fit.test.mjs`, `node wall-pipe-solver.test.mjs`, `node wall-viewport.test.mjs`, `node wall-picking.test.mjs`, `node main-pipe-detail.test.mjs`, `node main-detail-annotations.test.mjs`, `node wall-detail-geometry.test.mjs`, `node wall-planner-corners.test.mjs`, `node wall-label-layout.test.mjs`, `node wall-plan-migration.test.mjs`, `node room-routing.test.mjs`, `node dimension-layout.test.mjs`, `node bend-references.test.mjs`, `node blank-layout.test.mjs` og `node offset-visual.test.mjs`. Testene dækker buegeometri, kompatibilitet med ældre projekter, begge målemetoder, producenttabeller, samlinger og fysiske rør, afsætningsmærker, åbne vægforløb, redigering af røret ved faste vægge, klammer, faktiske radiusbuer, kollisionskontrol, umulige mål og tegningens referencer.
+Kør `node test.mjs` for den hurtige grundtest. Alle selvstændige testsæt kan køres med `for test_file in *test.mjs; do node "$test_file" || exit 1; done`. Testene dækker blandt andet buegeometri, bukfarver og speciallabels, 3D-projektion af samlinger, ældre projekter, målemetoder, producenttabeller, fysiske rør, afsætningsmærker, vægforløb, kollisionskontrol og tegningens referencer.
 
 ## Sprog / Språk / Language
 Vælg Norsk (bokmål), English eller Dansk øverst i appen. Valget gemmes på enheden. Sprogskift ændrer ikke projektets navn, mål eller trekantens retning.
