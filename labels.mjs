@@ -1,4 +1,4 @@
-import {rectPolygon,polygonsOverlap} from './dimension-layout.mjs?v=42';
+import {rectPolygon,polygonsOverlap} from './dimension-layout.mjs?v=43';
 
 const bounds=polygon=>({minX:Math.min(...polygon.map(p=>p[0])),maxX:Math.max(...polygon.map(p=>p[0])),minY:Math.min(...polygon.map(p=>p[1])),maxY:Math.max(...polygon.map(p=>p[1]))});
 const inside=(polygon,width,height,padding)=>polygon.every(([x,y])=>x>=padding&&x<=width-padding&&y>=padding&&y<=height-padding);
@@ -90,9 +90,9 @@ export function bendReferenceLayout(arcs,project,options={}) {
   const midpoint=arc.samples[Math.floor((arc.samples.length-1)/2)],p=project(midpoint),center=arc.center?project(arc.center):null;
   const length=center?distance(p,center):0;
   const id=arc.displayId||'B'+(index+1),label=labelFor?.(arc,index,id);
-  return {type:'angle',index,order:index,x:p[0],y:p[1],id,...(Array.isArray(label)?{labelLines:label}:label?{labelText:String(label)}:{}),outward:length?[(p[0]-center[0])/length,(p[1]-center[1])/length]:undefined};
+  return {type:'angle',index,order:index,x:p[0],y:p[1],id,labelVisible:label!==false,...(Array.isArray(label)?{labelLines:label}:label?{labelText:String(label)}:{}),outward:length?[(p[0]-center[0])/length,(p[1]-center[1])/length]:undefined};
  });
- return {...referenceLayout(refs,layoutOptions),anchors:refs,project};
+ return {...referenceLayout(refs.filter(ref=>ref.labelVisible),layoutOptions),anchors:refs,project};
 }
 // Rotate only the view, never the pipe model. Prefer a wide, readable fit.
 export function bestDrawingAngle(points,width=460,height=300){

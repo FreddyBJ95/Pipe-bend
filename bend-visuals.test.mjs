@@ -7,7 +7,9 @@ for(const angle of STANDARD_BEND_ANGLES){
  assert.equal(positive.standard,true);assert.equal(positive.key,String(angle));assert.deepEqual(negative,positive);
 }
 assert.equal(bendVisual(45).stroke,'#1565A8');
+assert.equal(bendVisual(45).tube,'#4B8FC2');
 assert.equal(bendVisual(90).stroke,'#185C46');
+assert.equal(bendVisual(60).tube,'#D0A91E');
 assert.equal(bendVisual(37).standard,false);assert.equal(bendVisual(37).key,'special');
 assert.equal(bendVisual(45+1e-7).standard,true);assert.equal(bendVisual(45.01).standard,false);
 assert.deepEqual(bendBadgeLines('B3',45),['B3','45°']);

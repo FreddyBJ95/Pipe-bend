@@ -1,24 +1,24 @@
-import {initAppSharing} from './share-app.mjs?v=42';
+import {initAppSharing} from './share-app.mjs?v=43';
 import {SWAGELOK_BENDERS,getBender} from './benders.mjs';
 import {measurementMode,validateMeasurements,convertMeasurementMode,bendMarkLayout} from './measurements.mjs';
-import {roundDisplayedMarks} from './displayed-marks.mjs?v=42';
-import {isProjectId} from './project-storage.mjs?v=42';
-import {initRoomPlanner} from './room-planner.mjs?v=42';
+import {roundDisplayedMarks} from './displayed-marks.mjs?v=43';
+import {isProjectId} from './project-storage.mjs?v=43';
+import {initRoomPlanner} from './room-planner.mjs?v=43';
 import {renderOffsetVisualization} from './offset-visual.mjs';
-import {initTypography} from './typography.mjs?v=42';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=42';
-import {layoutBlankMarks} from './blank-layout.mjs?v=42';
-import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=42';
-import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=42';
+import {initTypography} from './typography.mjs?v=43';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=43';
+import {layoutBlankMarks} from './blank-layout.mjs?v=43';
+import {bendReferenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=43';
+import {t,language,locales,captureTranslations,applyLanguage} from './i18n.mjs?v=43';
 import{geometry,extend,triangle,practicalOffsetLength,calculate}from'./geometry.mjs';
-import {wallValidationStatus} from './wall-validation-status.mjs?v=42';
-import {createMainPipeDrawing} from './main-pipe-drawing.mjs?v=42';
-import {geometry3D,extendSpatial,validateSpatialState,hasSpatialPipe,bendOrientation,spatialBendRotations} from './spatial-geometry.mjs?v=42';
-import {spatialHeightLayers} from './spatial-layers.mjs?v=42';
-import {createSpatialPipeDrawing,renderSpatialWorkDrawing} from './spatial-drawing.mjs?v=42';
-import {setIconButton} from './ui-icons.mjs?v=42';
-import {materialPlan,suggestMaterialJoints,validateMaterialJoints,jointPoint,pieceLayoutMarks,pieceWorkProject} from './material-sections.mjs?v=42';
-import {bendVisual,bendBadgeLines,bendAccessibleLabel} from './bend-visuals.mjs?v=42';
+import {wallValidationStatus} from './wall-validation-status.mjs?v=43';
+import {createMainPipeDrawing} from './main-pipe-drawing.mjs?v=43';
+import {geometry3D,extendSpatial,validateSpatialState,hasSpatialPipe,bendOrientation,spatialBendRotations} from './spatial-geometry.mjs?v=43';
+import {spatialHeightLayers} from './spatial-layers.mjs?v=43';
+import {createSpatialPipeDrawing,renderSpatialWorkDrawing} from './spatial-drawing.mjs?v=43';
+import {setIconButton} from './ui-icons.mjs?v=43';
+import {materialPlan,suggestMaterialJoints,validateMaterialJoints,jointPoint,pieceLayoutMarks,pieceWorkProject} from './material-sections.mjs?v=43';
+import {bendVisual,bendBadgeLines,bendAccessibleLabel} from './bend-visuals.mjs?v=43';
 const $=id=>document.getElementById(id),fmt=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:getBender(state.benderId)?.nativeUnits==='in'?3:1}):'—',fmtAngle=n=>Number.isFinite(n)?n.toLocaleString(locales[language],{maximumFractionDigits:3}):'—';
 function newDrawingNumber(){const d=new Date(),date=[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('');return 'PB-'+date+'-'+crypto.randomUUID().slice(0,6).toUpperCase();}
 function normalizeProject(s){const name=s.name.trim()||t('Mit første rør');return {...s,projectId:isProjectId(s.projectId)?s.projectId:crypto.randomUUID(),name,configured:s.configured!==false,drawingNumber:s.drawingNumber?.trim()||name,jointClearance:s.jointClearance??50,joints:s.joints??[]};}
@@ -226,7 +226,7 @@ function draw(g,preview,target=$('drawing'),work=false,options={}){
  if(preview){let shift=[0,0];if(end==='A'){const p=preview.lines[1].start;shift=[-p[0],-p[1]];}path(preview,{stroke:'#97c6b0','stroke-width':2,'stroke-dasharray':'8 8',opacity:.6},shift);}
  path(g,{stroke:'#9db6ab','stroke-width':14});path(g,{stroke:'#deeee7','stroke-width':9});path(g,{stroke:'#487b69','stroke-width':1,'stroke-dasharray':'4 5'});
  for(const [index,arc]of g.arcs.entries()){
-  const visual=bendVisual(arc.turn),points=arc.samples.map(P),attrs={'data-bend-color':visual.key,'data-bend-kind':visual.standard?'standard':'special','data-bend-id':arc.displayId||'B'+(index+1),d:points.map((point,i)=>(i?'L':'M')+point.join(' ')).join(' '),fill:'none',stroke:visual.stroke,'stroke-width':work?5:3.2,'stroke-linecap':'round','pointer-events':'none'};if(visual.dash)attrs['stroke-dasharray']=visual.dash;el('path',attrs,pipes);
+	 const visual=bendVisual(arc.turn),id=arc.displayId||'B'+(index+1),accessible=bendAccessibleLabel(id,arc.turn,{format:fmtAngle,special:t('SPECIAL')}),points=arc.samples.map(P),d=points.map((point,i)=>(i?'L':'M')+point.join(' ')).join(' '),outer=el('path',{'data-bend-color':visual.key,'data-bend-kind':visual.standard?'standard':'special','data-bend-id':id,'aria-label':accessible,d,fill:'none',stroke:visual.stroke,'stroke-width':14,'stroke-linecap':'butt','stroke-linejoin':'round','pointer-events':'none'},pipes);el('title',{},outer).textContent=accessible;el('path',{d,fill:'none',stroke:visual.tube,'stroke-width':9,'stroke-linecap':'butt','stroke-linejoin':'round','pointer-events':'none'},pipes);el('path',{d,fill:'none',stroke:visual.stroke,'stroke-width':1,'stroke-dasharray':visual.dash||'4 5','stroke-linecap':'butt','pointer-events':'none'},pipes);
  }
  if(!work)for(let index=0;index<g.lines.length;index++){const a=P(g.lines[index].start),b=P(g.lines[index].end);el('line',{'data-length-id':'L'+(index+1),class:'reference-path',x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:'#278f70','stroke-width':20,'stroke-linecap':'round','pointer-events':'none',opacity:0},pipes);}
  const rect=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
@@ -235,7 +235,7 @@ function draw(g,preview,target=$('drawing'),work=false,options={}){
  for(const line of g.lines)pipe.push({polygon:footprint(P(line.start),P(line.end))});
  for(let index=0;index<g.arcs.length;index++){const arc=g.arcs[index];for(let j=0;j<arc.samples.length-1;j+=4)pipe.push({index,polygon:footprint(P(arc.samples[j]),P(arc.samples[Math.min(j+4,arc.samples.length-1)]))});}
  const endpointObstacles=[P(g.start),P(g.end)].map(p=>rect(p[0]-23,p[1]-23,46,46));
- const layout=bendReferenceLayout(g.arcs,P,{width,height:pageHeight,fontSize:work?18:13,obstacles:endpointObstacles,pipe,maxLeader:28,labelFor:(arc,index,id)=>bendBadgeLines(id,arc.turn,{format:fmtAngle,special:t('SPECIAL')})});
+	const layout=bendReferenceLayout(g.arcs,P,{width,height:pageHeight,fontSize:work?18:13,obstacles:endpointObstacles,pipe,maxLeader:28,labelFor:(arc,index,id)=>bendVisual(arc.turn).standard?false:bendBadgeLines(id,arc.turn,{format:fmtAngle,special:t('SPECIAL')})});
  const obstacles=[...pipe.map(p=>p.polygon),...endpointObstacles,...layout.labels.map(p=>p.polygon),...layout.labels.map(p=>footprint(...p.leader,2))];
  const fontSize=work?18:14,metrics=document.createElement('canvas').getContext('2d');metrics.font=`600 ${fontSize}px ${getComputedStyle(svg).fontFamily}`;
  const items=g.lines.map((line,index)=>{const a=P(line.start),b=P(line.end),id=line.displayId||'L'+(index+1),text=(options.showReferenceIds?id+' · ':'')+fmt(line.dimension??line.length)+(work?' mm':'');return{id,index,a,b,text,width:Math.ceil(metrics.measureText(text).width)+14,height:fontSize+10,angle:readableTextAngle(b[0]-a[0],b[1]-a[1])};});
@@ -272,10 +272,11 @@ function draw(g,preview,target=$('drawing'),work=false,options={}){
   el('title',{},badge).textContent=accessible+' · '+t(arc.turn>0?'Venstre':'Højre');
   if(!work)makeEditable(badge,'angle',ref.index);
  }
- for(const ref of layout.anchors){
-  const arc=g.arcs[ref.index],visual=bendVisual(arc.turn),anchor=el('g',{'data-bend-id':ref.id,'data-bend-anchor':ref.id,'data-bend-code':visual.key,class:'bend-anchor'},labels);
+	const placedSpecial=new Set(layout.labels.map(label=>label.index));
+	for(const ref of layout.anchors){
+	 const arc=g.arcs[ref.index],visual=bendVisual(arc.turn),anchor=el('g',{'data-bend-id':ref.id,'data-bend-anchor':ref.id,'data-bend-code':visual.key,class:'bend-anchor'},labels);
   if(!work)el('circle',{cx:ref.x,cy:ref.y,r:10,fill:'transparent'},anchor);
-  el('circle',{'data-bend':ref.id,cx:ref.x,cy:ref.y,r:3,fill:visual.stroke,stroke:'white','stroke-width':1.2},anchor);
+	 const offset=work?13:10,x=ref.x+(ref.outward?.[0]||0)*offset,y=ref.y+(ref.outward?.[1]||0)*offset;if(visual.standard||!placedSpecial.has(ref.index)){const text=el('text',{'data-bend-inline-label':ref.id,x,y:y+(work?4.5:3.5),'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':visual.standard?(work?13:10):(work?12:9.5),'font-weight':800,fill:visual.text,'paint-order':'stroke',stroke:'#fff','stroke-width':work?4:3,'stroke-linejoin':'round'},anchor);text.textContent=visual.standard?ref.id:ref.id+' · '+t('SPECIAL')+' '+fmtAngle(Math.abs(arc.turn))+'°';}else el('circle',{'data-bend':ref.id,cx:ref.x,cy:ref.y,r:3,fill:visual.stroke,stroke:'white','stroke-width':1.2},anchor);
   el('title',{},anchor).textContent=bendAccessibleLabel(ref.id,arc.turn,{format:fmtAngle,special:t('SPECIAL')});
   if(!work)makeEditable(anchor,'angle',ref.index);
  }
@@ -290,7 +291,7 @@ function draw(g,preview,target=$('drawing'),work=false,options={}){
 	 const label=endpointLabels[index]||['A','B'][index];if(work&&label.startsWith('S'))continue;const staticEndpointLabel=label==='K'?'K · '+t('fysisk kapende'):label,q=P(p),e=el('g',{class:'endpoint','aria-label':staticEndpointLabel},ends);el('circle',{cx:q[0],cy:q[1],r:23,fill:'transparent'},e);el('circle',{cx:q[0],cy:q[1],r:16,fill:['A','B'][index]===end?'#16815d':'#183c36',stroke:'white','stroke-width':3},e);el('text',{x:q[0],y:q[1]+5,fill:'white','font-size':label.length>2?10:14,'font-weight':700,'text-anchor':'middle'},e).textContent=label;
   if(work)continue;e.setAttribute('role','button');e.setAttribute('tabindex','0');e.setAttribute('aria-label',t('Tilføj buk ved ende ')+label);const select=()=>{end=label;render();$('angle').scrollIntoView({behavior:'smooth',block:'center'});$('angle').focus({preventScroll:true});};e.onclick=select;e.onkeydown=k=>{if(k.key==='Enter'||k.key===' '){k.preventDefault();select();}};
  }
- svg.setAttribute('data-inline-bends',String(layout.labels.length));svg.setAttribute('data-total-bends',String(g.arcs.length));
+	svg.setAttribute('data-inline-bends',String(layout.anchors.length));svg.setAttribute('data-total-bends',String(g.arcs.length));
  setBounds();if(!work&&$('drawing-references'))renderReferences(g,$('drawing-references'));
 }
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import {spatialLayerSelection} from './spatial-layers.mjs?v=42';
-import {geometry3D} from './spatial-geometry.mjs?v=42';
-import {projectSpatialPoint,projectSpatialGeometry,spatialArcSamples,spatialLineVisibility,pickSpatialParts,spatialRiseLabelData,classifySpatialProjection,renderSpatialWorkDrawing} from './spatial-drawing.mjs?v=42';
+import {spatialLayerSelection} from './spatial-layers.mjs?v=43';
+import {geometry3D} from './spatial-geometry.mjs?v=43';
+import {projectSpatialPoint,projectSpatialGeometry,spatialArcSamples,spatialLineVisibility,pickSpatialParts,spatialRiseLabelData,classifySpatialProjection,renderSpatialWorkDrawing} from './spatial-drawing.mjs?v=43';
 
 const close=(a,b,epsilon=1e-7)=>assert(Math.abs(a-b)<=epsilon,`${a} != ${b}`);
 assert.deepEqual(projectSpatialPoint([12,34,56],'top'),[12,34,56]);
@@ -181,7 +181,12 @@ const colored=geometry3D({radius:38,heading:0,measurementMode:'tangent',lengths:
 renderSpatialWorkDrawing(colorSvg,colored,{view:'top',formatAngle:value=>String(value),translate:value=>value,width:900,height:720});
 const colorNodes=rootNodes(colorSvg),tokens=new Set(colorNodes.map(item=>item.getAttribute('data-bend-color')).filter(Boolean));
 assert(tokens.has('45'));assert(tokens.has('90'));assert(tokens.has('special'));
-assert(colorNodes.some(item=>item.getAttribute('data-bend-code')==='45'));
+assert(colorNodes.some(item=>item.getAttribute('data-spatial-inline-bend')==='B1'&&item.getAttribute('data-bend-code')==='45'));
+assert(colorNodes.some(item=>item.getAttribute('data-spatial-inline-bend')==='B3'&&item.getAttribute('data-bend-code')==='90'));
+assert(!colorNodes.some(item=>['B1','B3'].includes(item.getAttribute('data-spatial-label'))),'Standard bends use the colored tube and a small inline B tag, not a large label card');
 assert(colorNodes.some(item=>item.getAttribute('data-bend-kind')==='special'));
 assert(colorNodes.some(item=>item.getAttribute('data-bend-angle')==='B2'&&item.textContent==='SPECIAL · 37°'));
-console.log('Static spatial bend colors: blue 45°, dark-green 90° and explicit non-color SPECIAL label PASS');
+const tappedColorSvg=new FakeSvgNode('svg',fakeDocument);renderSpatialWorkDrawing(tappedColorSvg,colored,{view:'top',labelMode:'tap',selected:{type:'angle',index:0},formatAngle:value=>String(value),translate:value=>value,width:900,height:720});const tappedColorNodes=rootNodes(tappedColorSvg);
+assert(tappedColorNodes.some(item=>item.getAttribute('data-spatial-label')==='B1'),'A tapped standard bend can still reveal its detailed card');
+assert(tappedColorNodes.some(item=>item.getAttribute('data-bend-angle')==='B1'&&item.textContent==='45°'));
+console.log('Static spatial bend colors: colored 45°/90° tube bodies, compact standard tags, tap details and explicit SPECIAL label PASS');

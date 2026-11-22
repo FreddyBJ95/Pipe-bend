@@ -1,9 +1,9 @@
-import {createWallViewport} from './wall-viewport.mjs?v=42';
-import {mainPipeToSvgPath,pipeDetailStrokeWidths} from './main-pipe-detail.mjs?v=42';
-import {layoutMainDetailAnnotations} from './main-detail-annotations.mjs?v=42';
-import {placeDimensionLabels} from './dimension-layout.mjs?v=42';
-import {referenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=42';
-import {bendVisual,bendBadgeLines,bendAccessibleLabel} from './bend-visuals.mjs?v=42';
+import {createWallViewport} from './wall-viewport.mjs?v=43';
+import {mainPipeToSvgPath,pipeDetailStrokeWidths} from './main-pipe-detail.mjs?v=43';
+import {layoutMainDetailAnnotations} from './main-detail-annotations.mjs?v=43';
+import {placeDimensionLabels} from './dimension-layout.mjs?v=43';
+import {referenceLayout,bestDrawingAngle,readableTextAngle,leaderCrossesPipe} from './labels.mjs?v=43';
+import {bendVisual,bendBadgeLines,bendAccessibleLabel} from './bend-visuals.mjs?v=43';
 
 const NS='http://www.w3.org/2000/svg';
 const rect=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
@@ -31,12 +31,15 @@ export function createMainPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=Stri
  function editable(item,type,index){item.setAttribute('role','button');item.setAttribute('tabindex','0');item.onclick=()=>onEdit(type,index);item.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onEdit(type,index);}};}
  function update(state){
   if(!frame)return;
-  const {geometry:g,settings,P,scale,overview,outer,inner,center,annotations,highlights}=frame;
+  const {geometry:g,settings,P,scale,overview,outer,inner,center,bendBodies,bendInners,bendCenters,annotations,highlights}=frame;
   const density=state.pixelsPerUnit||1,boundsRect=svg.getBoundingClientRect?.(),width=Number(boundsRect?.width)||state.width,height=Number(boundsRect?.height)||state.height;
   const toScreen=p=>[(p[0]-state.x)*density+width/2,(p[1]-state.y)*density+height/2],project=p=>toScreen(P(p)),toBase=p=>[state.x+(p[0]-width/2)/density,state.y+(p[1]-height/2)/density];
   const stroke=pipeDetailStrokeWidths({diameter:settings.diameter,scale,pixelsPerUnit:density});
   svg.setAttribute('data-screen-density',String(density));svg.setAttribute('data-detail-zoom',String(state.zoom));
   overview.setAttribute('display',stroke.screenWidth<1.5?'inline':'none');outer.setAttribute('stroke-width',stroke.outerWidth);inner.setAttribute('stroke-width',stroke.innerWidth);inner.setAttribute('display',stroke.innerWidth>0?'inline':'none');center.setAttribute('display',stroke.showCenterline?'inline':'none');
+  for(const body of bendBodies)body.setAttribute('stroke-width',stroke.outerWidth);
+  for(const bendInner of bendInners){bendInner.setAttribute('stroke-width',stroke.innerWidth);bendInner.setAttribute('display',stroke.innerWidth>0?'inline':'none');}
+  for(const bendCenter of bendCenters)bendCenter.setAttribute('display',stroke.showCenterline?'inline':'none');
   for(const highlight of highlights)highlight.setAttribute('stroke-width',stroke.outerWidth);
   const focused=document.activeElement,focusKey=annotations.contains?.(focused)?focused?.getAttribute?.('data-focus-key'):null;
   annotations.replaceChildren();
@@ -50,8 +53,9 @@ export function createMainPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=Stri
   for(const line of g.lines){const polygon=footprint(project(line.start),project(line.end),halfWidth);if(nearViewport(polygon))pipe.push({polygon});}
   g.arcs.forEach((arc,index)=>{const sampleAngle=Math.abs(arc.turn)*Math.PI/180/Math.max(1,arc.samples.length-1),step=Math.max(1,Math.min(4,Math.floor(Math.sqrt(4/Math.max(1,settings.radius*scale*density))/sampleAngle)));for(let j=0;j<arc.samples.length-1;j+=step){const next=Math.min(j+step,arc.samples.length-1),bow=settings.radius*scale*density*(1-Math.cos(sampleAngle*(next-j)/2)),polygon=footprint(project(arc.samples[j]),project(arc.samples[next]),halfWidth+bow);if(nearViewport(polygon))pipe.push({index,polygon});}});
   const endpointObstacles=[project(g.start),project(g.end)].filter(p=>inView(p,30)).map(p=>rect(p[0]-23,p[1]-23,46,46));
-  const anchors=g.arcs.map((arc,index)=>{const p=project(arc.samples[Math.floor((arc.samples.length-1)/2)]),id=arc.displayId||'B'+(index+1);return{type:'angle',index,order:index,x:p[0],y:p[1],id,labelLines:bendBadgeLines(id,arc.turn,{format:formatAngle,special:translate('SPECIAL')})};}).filter(p=>inView([p.x,p.y],2));
-  const layout=referenceLayout(anchors,{width,height,fontSize:13,obstacles:endpointObstacles,pipe,maxLeader:28});
+  const anchors=g.arcs.map((arc,index)=>{const p=project(arc.samples[Math.floor((arc.samples.length-1)/2)]),centerPoint=arc.center?project(arc.center):p,radial=[p[0]-centerPoint[0],p[1]-centerPoint[1]],radialLength=Math.hypot(...radial)||1,id=arc.displayId||'B'+(index+1),visual=bendVisual(arc.turn);return{type:'angle',index,order:index,x:p[0],y:p[1],tagX:p[0]+radial[0]/radialLength*11,tagY:p[1]+radial[1]/radialLength*11,id,visual,accessible:bendAccessibleLabel(id,arc.turn,{format:formatAngle,special:translate('SPECIAL')})};}).filter(p=>inView([p.x,p.y],2));
+  const specialAnchors=anchors.filter(anchor=>!anchor.visual.standard).map(anchor=>({...anchor,labelLines:bendBadgeLines(anchor.id,g.arcs[anchor.index].turn,{format:formatAngle,special:translate('SPECIAL')})}));
+  const layout=referenceLayout(specialAnchors,{width,height,fontSize:13,obstacles:endpointObstacles,pipe,maxLeader:28});
   const obstacles=[...pipe.map(item=>item.polygon),...endpointObstacles,...layout.labels.map(item=>item.polygon),...layout.labels.map(item=>footprint(...item.leader,2))];
   const fontSize=14,metrics=document.createElement('canvas').getContext('2d');metrics.font=`600 ${fontSize}px ${getComputedStyle(svg).fontFamily}`;
   const items=g.lines.flatMap((line,index)=>{const visible=visibleLine(project(line.start),project(line.end),width,height);if(!visible)return[];const [a,b]=visible,text=format(line.dimension??line.length);return[{id:'L'+(index+1),index,a,b,text,width:Math.ceil(metrics.measureText(text).width)+14,height:fontSize+10,angle:readableTextAngle(b[0]-a[0],b[1]-a[1])}];});
@@ -78,7 +82,8 @@ export function createMainPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=Stri
    const badge=node('g',{'data-reference':ref.id,'data-bend-id':ref.id,'data-bend-code':visual.key,'data-bend-kind':visual.standard?'standard':'special','data-focus-key':ref.id,class:'reference-badge','aria-label':accessible},labels),box={x:ref.labelX-ref.width/2,y:ref.labelY-ref.height/2,width:ref.width,height:ref.height,rx:Math.min(12,ref.height/2),fill:visual.fill,stroke:visual.stroke,'stroke-width':visual.standard?1.2:1.8};if(visual.dash)box['stroke-dasharray']=visual.dash;node('rect',box,badge);
    const lineHeight=ref.fontSize*1.05,first=ref.labelY-(ref.labelLines.length-1)*lineHeight/2+ref.fontSize*.34;ref.labelLines.forEach((text,index)=>node('text',{x:ref.labelX,y:first+index*lineHeight,'font-family':'var(--app-font, sans-serif)','font-size':index?ref.fontSize*.88:ref.fontSize,'font-weight':index?600:700,'text-anchor':'middle',fill:visual.text},badge,text));node('title',{},badge,accessible);editable(badge,'angle',ref.index);
   }
-  for(const ref of anchors){const arc=g.arcs[ref.index],visual=bendVisual(arc.turn),accessible=bendAccessibleLabel(ref.id,arc.turn,{format:formatAngle,special:translate('SPECIAL')}),anchor=node('g',{'data-bend-id':ref.id,'data-bend-anchor':ref.id,'data-focus-key':'anchor:'+ref.id,'data-bend-code':visual.key,class:'bend-anchor','aria-label':accessible},labels);node('circle',{cx:ref.x,cy:ref.y,r:12,fill:'transparent'},anchor);node('circle',{'data-bend':ref.id,cx:ref.x,cy:ref.y,r:3,fill:visual.stroke,stroke:'#fff','stroke-width':1.2},anchor);editable(anchor,'angle',ref.index);}
+  const placedSpecial=new Set(layout.labels.map(label=>label.index));
+  for(const ref of anchors){const {visual,accessible}=ref,anchor=node('g',{'data-bend-id':ref.id,'data-bend-anchor':ref.id,'data-focus-key':'anchor:'+ref.id,'data-bend-code':visual.key,class:'bend-anchor','aria-label':accessible},labels);node('circle',{cx:ref.x,cy:ref.y,r:18,fill:'transparent'},anchor);if(visual.standard)node('text',{'data-bend-inline-label':ref.id,x:ref.tagX,y:ref.tagY+3.5,'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':10,'font-weight':800,fill:visual.text,'paint-order':'stroke',stroke:'#fff','stroke-width':3,'stroke-linejoin':'round'},anchor,ref.id);else if(!placedSpecial.has(ref.index))node('text',{'data-bend-inline-label':ref.id,x:ref.tagX,y:ref.tagY+3.5,'text-anchor':'middle','font-family':'var(--app-font, sans-serif)','font-size':9.5,'font-weight':800,fill:visual.text,'paint-order':'stroke',stroke:'#fff','stroke-width':3,'stroke-linejoin':'round'},anchor,ref.id+' · '+translate('SPECIAL')+' '+formatAngle(Math.abs(g.arcs[ref.index].turn))+'°');else node('circle',{'data-bend':ref.id,cx:ref.x,cy:ref.y,r:3,fill:visual.stroke,stroke:'#fff','stroke-width':1.2},anchor);node('title',{},anchor,accessible);editable(anchor,'angle',ref.index);}
   for(const [jointIndex,joint]of (settings.joints||[]).entries()){
    const line=g.lines[joint.lineIndex];if(!line)continue;
    const fraction=joint.distance/line.length,world=line.start.map((value,index)=>value+(line.end[index]-value)*fraction),point=project(world);if(!inView(point,72))continue;
@@ -100,7 +105,7 @@ export function createMainPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=Stri
    const endpoint=node('g',{class:'endpoint','data-endpoint':letter,'data-focus-key':'end:'+letter,role:'button',tabindex:0,'aria-label':translate('Tilføj buk ved ende ')+letter},ends);
    node('circle',{cx:q[0],cy:q[1],r:23,fill:'transparent'},endpoint);node('circle',{cx:q[0],cy:q[1],r:16,fill:letter===settings.end?'#16815d':'#183c36',stroke:'#fff','stroke-width':3},endpoint);node('text',{x:q[0],y:q[1]+5,fill:'#fff','font-size':14,'font-weight':700,'text-anchor':'middle'},endpoint,letter);endpoint.onclick=()=>onEndpoint(letter);endpoint.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onEndpoint(letter);}};
   }
-  svg.setAttribute('data-inline-bends',String(layout.labels.length));svg.setAttribute('data-total-bends',String(g.arcs.length));
+  svg.setAttribute('data-inline-bends',String(anchors.length));svg.setAttribute('data-total-bends',String(g.arcs.length));
   if(focusKey){const next=[...annotations.querySelectorAll('[data-focus-key]')].find(item=>item.getAttribute('data-focus-key')===focusKey);(next||svg).focus?.({preventScroll:true});}
  }
  function draw(geometry,preview,settings){
@@ -114,12 +119,13 @@ export function createMainPipeDrawing({svg,zoomIn,zoomOut,fit,output,format=Stri
   const pipes=node('g',{'data-layer':'pipe'}),path=(geo,attrs,delta)=>node('path',{d:mainPipeToSvgPath(geo,{radius:settings.radius,mapPoint:P,scale,flipY:true,delta}),fill:'none','stroke-linecap':'butt','stroke-linejoin':'round',...attrs},pipes);
   if(preview){let delta=[0,0];if(settings.end==='A'){const p=preview.lines[1].start;delta=[-p[0],-p[1]];}path(preview,{'data-pipe-preview':'',stroke:'#97c6b0','stroke-width':2,'stroke-dasharray':'8 8','vector-effect':'non-scaling-stroke',opacity:.6},delta);}
   const overview=path(geometry,{'data-pipe-overview':'',stroke:'#6d9685','stroke-width':1.25,'vector-effect':'non-scaling-stroke','pointer-events':'none'}),outer=path(geometry,{'data-pipe-body':'',stroke:'#9db6ab','stroke-width':settings.diameter*scale}),inner=path(geometry,{'data-pipe-inner':'',stroke:'#deeee7'}),center=path(geometry,{'data-pipe-centerline':'',stroke:'#487b69','stroke-width':.65,'stroke-dasharray':'4 5','vector-effect':'non-scaling-stroke'});
+  const bendBodies=[],bendInners=[],bendCenters=[];
   for(const [index,arc]of geometry.arcs.entries()){
-   const visual=bendVisual(arc.turn),points=arc.samples.map(P),attrs={'data-bend-color':visual.key,'data-bend-kind':visual.standard?'standard':'special','data-bend-id':arc.displayId||'B'+(index+1),d:points.map((point,i)=>(i?'L':'M')+point.join(' ')).join(' '),fill:'none',stroke:visual.stroke,'stroke-width':3.2,'vector-effect':'non-scaling-stroke','stroke-linecap':'round','pointer-events':'none'};if(visual.dash)attrs['stroke-dasharray']=visual.dash;node('path',attrs,pipes);
+   const visual=bendVisual(arc.turn),id=arc.displayId||'B'+(index+1),accessible=bendAccessibleLabel(id,arc.turn,{format:formatAngle,special:translate('SPECIAL')}),points=arc.samples.map(P),d=points.map((point,i)=>(i?'L':'M')+point.join(' ')).join(' '),body=node('path',{'data-bend-color':visual.key,'data-bend-kind':visual.standard?'standard':'special','data-bend-id':id,'aria-label':accessible,d,fill:'none',stroke:visual.stroke,'stroke-width':settings.diameter*scale,'stroke-linecap':'butt','stroke-linejoin':'round','pointer-events':'none'},pipes);bendBodies.push(body);node('title',{},body,accessible);bendInners.push(node('path',{d,fill:'none',stroke:visual.tube,'stroke-linecap':'butt','stroke-linejoin':'round','pointer-events':'none'},pipes));bendCenters.push(node('path',{d,fill:'none',stroke:visual.stroke,'stroke-width':.65,'vector-effect':'non-scaling-stroke','stroke-dasharray':visual.dash||'4 5','stroke-linecap':'butt','pointer-events':'none'},pipes));
   }
   const highlights=geometry.lines.map((line,index)=>{const a=P(line.start),b=P(line.end);return node('line',{'data-length-id':'L'+(index+1),class:'reference-path',x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:'#278f70','stroke-width':settings.diameter*scale,'stroke-linecap':'butt','pointer-events':'none',opacity:0},pipes);});
   const annotations=node('g',{'data-layer':'annotations'});
-  frame={geometry,settings:{...settings},P,scale,overview,outer,inner,center,annotations,highlights};viewport.setOnChange(update);
+  frame={geometry,settings:{...settings},P,scale,overview,outer,inner,center,bendBodies,bendInners,bendCenters,annotations,highlights};viewport.setOnChange(update);
  }
  return{draw,reset:()=>viewport.reset(),getState:()=>viewport.getState()};
 }

@@ -19,11 +19,17 @@ Upload indholdet af denne mappe, **inklusive `.github`**, til roden af dit repos
 
 Appen installeres fra den HTTPS-adresse, GitHub Pages giver dig; en downloadet ZIP alene er ikke en installeret PWA.
 
+## Farvede buk direkte på røret (v43)
+
+Standardbuk på 30°/45°/60°/90° farver nu hele den fysiske bue på rørtegningen i henholdsvis violet, blå, gul og mørkegrøn. De tidligere store vinkelbokse er fjernet for standardbuk; kun et lille ubokset B-nummer bliver stående, mens fuld vinkel og retning fortsat findes i referencelister og bukkedata.
+
+En ikke-standard vinkel får fortsat bordeaux markering og en tydelig `SPECIAL`-label med den præcise grad. I rumlige visninger kan et standardbuk stadig vise det fulde detaljekort, når brugeren vælger **Mål → Ved tryk** og trykker på bukket. Samme visuelle princip bruges i redigering, arbejdsvisning, 3D og print.
+
 ## Tydelige samlinger og bukfarver (v42)
 
 Samlinger vises nu med en markant, dobbelt delelinje og labelen `S1 · DELING` i redigeringen, arbejdsvisningen, 3D-projektionerne og udskriften. En samling, der ses direkte ind i rørenden, vises som ring med kryds. Samlingspunktet projiceres fra den faktiske 3D-linje, så det ligger korrekt i visningerne ovenfra, forfra, fra siden og i 3D-overblikket.
 
-Gængse buk har faste farver og viser stadig graden som tekst: 30° er violet, 45° blå, 60° okker og 90° mørkegrøn. Alle andre vinkler får en bordeaux, stiplet markering og labelen `SPECIAL`, så farven aldrig er den eneste information. Farver og labels går igen på selve bukket, B-mærket, referencelisterne, de flade rørtegninger og de fysiske R-rørs arbejdstegninger.
+Gængse buk har faste farver: 30° er violet, 45° blå, 60° gul/okker og 90° mørkegrøn. Alle andre vinkler får en bordeaux markering og labelen `SPECIAL`. Den efterfølgende v43-visning lader hele rørbuen bære farven og reducerer standardmærket til et lille B-nummer; graden står fortsat i referencelister, fladtegninger og bukkedata.
 
 Visningsvalget **Rørtegning** hedder nu **Automatisk 2D**. Det er den automatisk drejede og tilpassede tegning af et plant rør; **Ovenfra** er derimod en fast XY-projektion. Når et rør bliver rumligt, skifter appen automatisk til Ovenfra.
 

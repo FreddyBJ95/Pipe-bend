@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {geometry,extend} from './geometry.mjs';
 import {bendReferenceLayout,bestDrawingAngle,leaderCrossesPipe} from './labels.mjs';
 import {polygonsOverlap} from './dimension-layout.mjs';
-import {bendBadgeLines} from './bend-visuals.mjs';
+import {bendVisual,bendBadgeLines} from './bend-visuals.mjs';
 
 const close=(a,b)=>assert.ok(Math.abs(a-b)<1e-8,`${a} != ${b}`);
 const rect=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
@@ -17,8 +17,9 @@ function scene(state,work=false,width=900,labelFor){
  const layout=bendReferenceLayout(g.arcs,project,{width,height,fontSize:work?18:13,pipe,obstacles,maxLeader:28,labelFor});
  assert.equal(layout.height,height,'References may not stretch the drawing and shrink text');
  assert.equal(layout.project,project,'Label placement cannot shift the model projection');
- assert.equal(layout.labels.length+layout.unplaced.length,g.arcs.length,'Every bend must remain accounted for');
- assert.deepEqual(new Set([...layout.labels,...layout.unplaced].map(p=>p.index)),new Set(g.arcs.map((_,i)=>i)));
+ const labeled=layout.anchors.filter(anchor=>anchor.labelVisible);
+ assert.equal(layout.labels.length+layout.unplaced.length,labeled.length,'Every requested bend label must remain accounted for');
+ assert.deepEqual(new Set([...layout.labels,...layout.unplaced].map(p=>p.index)),new Set(labeled.map(item=>item.index)));
  assert.deepEqual(g,original,'Annotation layout must not alter physical pipe geometry');
  for(const anchor of layout.anchors){const p=project(g.arcs[anchor.index].samples[Math.floor((g.arcs[anchor.index].samples.length-1)/2)]);close(anchor.x,p[0]);close(anchor.y,p[1]);assert.equal(anchor.id,'B'+(anchor.index+1));}
  for(const label of layout.labels){
@@ -45,9 +46,9 @@ for(const fixture of [old,screenshot,saved])for(const mirror of [1,-1]){
 for(const turn of [-135,-45,45,90])for(const work of [false,true])scene(extend(old,'A',220,turn),work);
 const dense={radius:80,heading:0,lengths:Array.from({length:201},(_,i)=>80+i%5*10),turns:Array.from({length:200},(_,i)=>i%2?-45:45)};
 for(const work of [false,true]){const layout=scene(dense,work);assert(layout.unplaced.length>0,'A dense project uses the complete list rather than overlapping SVG labels');assert.equal(layout.anchors.length,200);}
-const colored={radius:38,heading:0,measurementMode:'tangent',lengths:[500,420,460,380,520],turns:[30,45,37,90]},labelFor=(arc,index,id)=>bendBadgeLines(id,arc.turn,{format:String,special:'SPECIAL'}),wideColored=scene(colored,false,900,labelFor),narrowColored=scene(colored,false,304,labelFor);
-assert.equal(wideColored.labels.length,colored.turns.length);assert.deepEqual(wideColored.labels.map(label=>label.labelLines),[['B1','30°'],['B2','45°'],['B3','SPECIAL · 37°'],['B4','90°']]);
-assert.equal(narrowColored.labels.length+narrowColored.unplaced.length,colored.turns.length);assert(narrowColored.labels.every(label=>label.labelLines.length===2));
+const colored={radius:38,heading:0,measurementMode:'tangent',lengths:[500,420,460,380,520],turns:[30,45,37,90]},labelFor=(arc,index,id)=>bendVisual(arc.turn).standard?false:bendBadgeLines(id,arc.turn,{format:String,special:'SPECIAL'}),wideColored=scene(colored,false,900,labelFor),narrowColored=scene(colored,false,304,labelFor);
+assert.equal(wideColored.anchors.length,colored.turns.length);assert.equal(wideColored.labels.length,1);assert.deepEqual(wideColored.labels[0].labelLines,['B3','SPECIAL · 37°']);
+assert.equal(narrowColored.labels.length+narrowColored.unplaced.length,1);assert(narrowColored.labels.every(label=>label.labelLines.length===2));
 // A leader may share its source dot, but no foreign centreline crossing.
 assert(leaderCrossesPipe([0,0],[30,0],[{polygon:footprint([15,-10],[15,10])}]));
 assert(!leaderCrossesPipe([0,0],[0,20],[{polygon:footprint([-10,0],[10,0])}]));
